@@ -26,10 +26,10 @@ from PIL import Image
 from sklearn.metrics import confusion_matrix, roc_auc_score, roc_curve
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from seinsur.core import (CLASSES, MALIGNE, MODELS_DIR, ROOT, Settings, risk_level,  # noqa: E402
+from echobreast.core import (CLASSES, MALIGNE, MODELS_DIR, ROOT, Settings, risk_level,  # noqa: E402
                           softmax)
-from seinsur.data import read_split  # noqa: E402
-from seinsur.inference import Analyzer  # noqa: E402
+from echobreast.data import read_split  # noqa: E402
+from echobreast.inference import Analyzer  # noqa: E402
 
 
 def fit_temperature(logits: np.ndarray, y: np.ndarray) -> float:
@@ -62,6 +62,28 @@ def sens_spec(alert: np.ndarray, is_mal: np.ndarray) -> tuple[float, float]:
     sens = float(alert[is_mal].mean()) if is_mal.any() else float("nan")
     spec = float((~alert[~is_mal]).mean()) if (~is_mal).any() else float("nan")
     return sens, spec
+
+
+def wilson(k: int, n: int, z: float = 1.96) -> list[float] | None:
+    """Intervalle de confiance à 95 % (Wilson) d'une proportion k/n."""
+    if n == 0:
+        return None
+    p = k / n
+    d = 1 + z * z / n
+    c = (p + z * z / (2 * n)) / d
+    h = z * np.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d
+    return [float(max(0, c - h)), float(min(1, c + h))]
+
+
+def reliability(p: np.ndarray, y: np.ndarray, bins: int = 5) -> list[dict]:
+    """Courbe de calibration : probabilité prédite moyenne vs fréquence observée, par tranche."""
+    edges = np.linspace(0, 1, bins + 1)
+    out = []
+    for lo, hi in zip(edges[:-1], edges[1:]):
+        sel = (p >= lo) & ((p < hi) if hi < 1 else (p <= hi))
+        if sel.any():
+            out.append({"predite": float(p[sel].mean()), "observee": float(y[sel].mean()), "n": int(sel.sum())})
+    return out
 
 
 def main():
@@ -149,6 +171,12 @@ def main():
         "couleurs_par_classe_reelle": color_table,
         "ece_avant_calibration": ece(p_raw, y_te), "ece_apres_calibration": ece(p_te, y_te),
         "dice": float(np.mean(dice)) if dice else None, "iou": float(np.mean(iou)) if iou else None,
+        "matrice_alerte": {"vp": int((alert & is_mal).sum()), "fn": int((~alert & is_mal).sum()),
+                           "fp": int((alert & ~is_mal).sum()), "vn": int((~alert & ~is_mal).sum())},
+        "ic95": {"sensibilite": wilson(int((alert & is_mal).sum()), int(is_mal.sum())),
+                 "specificite": wilson(int((~alert & ~is_mal).sum()), int((~is_mal).sum()))},
+        "calibration_maligne": reliability(p_te[:, MALIGNE], is_mal.astype(float)),
+        "brier_maligne": float(np.mean((p_te[:, MALIGNE] - is_mal) ** 2)),
         "seuils": {"temperature": T, "t_orange": t_orange, "t_red": t_red,
                    "sensibilite_visee_validation": args.target_sens},
     }

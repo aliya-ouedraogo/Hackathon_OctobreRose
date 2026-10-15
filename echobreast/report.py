@@ -9,7 +9,7 @@ from PIL import Image
 
 from .core import CLASSES, LEVELS
 
-ROSE = (194, 24, 91)
+ROSE = (142, 29, 74)
 DISCLAIMER = ("Outil d'information et d'orientation, pas un diagnostic. Prototype de hackathon non valide "
               "cliniquement, entraine sur un jeu public (BUSI, Egypte) : performances non verifiees sur la "
               "population locale. La decision appartient au professionnel de sante.")
@@ -32,7 +32,7 @@ def build_pdf(annotated: Image.Image, result, model_version: str, case_name: str
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Helvetica", "B", 18)
     pdf.set_xy(12, 6)
-    pdf.cell(0, 10, _latin1("SeinSûr - Fiche de synthèse"))
+    pdf.cell(0, 10, _latin1("EchoBreast - Fiche de synthèse"))
     pdf.set_text_color(40, 40, 40)
 
     pdf.set_xy(12, 28)
@@ -95,6 +95,50 @@ def build_pdf(annotated: Image.Image, result, model_version: str, case_name: str
         pdf.cell(0, 7, _latin1(line), new_x="LMARGIN", new_y="NEXT")
 
     pdf.set_y(-38)
+    pdf.set_fill_color(252, 228, 236)
+    pdf.set_font("Helvetica", "B", 9)
+    pdf.multi_cell(0, 5, _latin1(DISCLAIMER), fill=True)
+    return bytes(pdf.output())
+
+
+def build_queue_pdf(rows: list[dict], model_version: str) -> bytes:
+    """Récapitulatif de la file de priorité : rang, examen, niveau, p(maligne), confiance, relu."""
+    pdf = FPDF(format="A4")
+    pdf.set_auto_page_break(True, 18)
+    pdf.add_page()
+    pdf.set_fill_color(*ROSE)
+    pdf.rect(0, 0, 210, 22, "F")
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Helvetica", "B", 17)
+    pdf.set_xy(12, 6)
+    pdf.cell(0, 10, _latin1("EchoBreast - File de priorité"))
+    pdf.set_text_color(40, 40, 40)
+    pdf.set_xy(12, 28)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(0, 6, _latin1(f"{dt.datetime.now():%d/%m/%Y %H:%M}   |   Version du modèle : {model_version}   |   "
+                           f"{len(rows)} examen(s)"), new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(3)
+    widths = [14, 70, 36, 30, 22, 14]
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.set_fill_color(244, 234, 245)
+    for w, h in zip(widths, ["Rang", "Examen", "Niveau", "p(maligne)", "Confiance", "Relu"]):
+        pdf.cell(w, 8, _latin1(h), border=0, fill=True)
+    pdf.ln(8)
+    pdf.set_font("Helvetica", "", 10)
+    for i, r in enumerate(rows, 1):
+        lv = LEVELS[r["level"]]
+        col = tuple(int(lv["color"][k:k + 2], 16) for k in (1, 3, 5))
+        pdf.cell(widths[0], 8, str(i))
+        pdf.cell(widths[1], 8, _latin1(r["name"][:38]))
+        pdf.set_text_color(*col)
+        pdf.cell(widths[2], 8, _latin1(lv["label"]))
+        pdf.set_text_color(40, 40, 40)
+        pdf.cell(widths[3], 8, f"{r['p']:.0%}")
+        pdf.cell(widths[4], 8, f"{r['conf']:.2f}")
+        pdf.cell(widths[5], 8, "oui" if r.get("relu") else "-", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_draw_color(239, 225, 234)
+        pdf.line(12, pdf.get_y(), 198, pdf.get_y())
+    pdf.ln(6)
     pdf.set_fill_color(252, 228, 236)
     pdf.set_font("Helvetica", "B", 9)
     pdf.multi_cell(0, 5, _latin1(DISCLAIMER), fill=True)

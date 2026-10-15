@@ -119,12 +119,19 @@ class Settings:
         path.write_text(json.dumps(self.__dict__, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
+APP_NAME = "EchoBreast"
+APP_TAGLINE = "Aide à la priorisation des échographies mammaires"
+
+# Couleur = toujours doublée d'une icône et d'un libellé (accessibilité).
 LEVELS = {
-    "rouge": {"rank": 0, "icon": "🔴", "label": "Prioritaire", "color": "#B3261E",
+    "rouge": {"rank": 0, "icon": "octagon-alert", "label": "Prioritaire", "color": "#C8264E",
+              "soft": "#FCE7EC", "short": "Prioritaire",
               "text": "Probabilité élevée de malignité selon le modèle : à traiter en priorité."},
-    "orange": {"rank": 1, "icon": "🟠", "label": "À relire", "color": "#E07B00",
+    "orange": {"rank": 1, "icon": "triangle-alert", "label": "À relire", "color": "#D9822B",
+               "soft": "#FCEFDF", "short": "À relire",
                "text": "Zone d'incertitude : relecture prioritaire recommandée."},
-    "vert": {"rank": 2, "icon": "🟢", "label": "Risque faible", "color": "#2E7D32",
+    "vert": {"rank": 2, "icon": "circle-check", "label": "Risque faible", "color": "#2F8F62",
+             "soft": "#E2F3EA", "short": "Risque faible",
              "text": "Risque faible selon le modèle — ce n'est pas une absence de maladie."},
 }
 

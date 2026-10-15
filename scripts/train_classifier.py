@@ -22,8 +22,8 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from seinsur.core import MALIGNE, MODELS_DIR, build_classifier  # noqa: E402
-from seinsur.data import BusiDataset  # noqa: E402
+from echobreast.core import MALIGNE, MODELS_DIR, build_classifier  # noqa: E402
+from echobreast.data import BusiDataset  # noqa: E402
 
 
 def run_epoch(model, loader, device, loss_fn, opt=None):

@@ -2,49 +2,49 @@
   {
     "file": "cas_01.png",
     "verite": "maligne",
-    "id": "malignant_38",
+    "id": "malignant_55",
     "erreur_du_modele": true
   },
   {
     "file": "cas_02.png",
-    "verite": "bénigne",
-    "id": "benign_11",
-    "erreur_du_modele": true
+    "verite": "maligne",
+    "id": "malignant_184",
+    "erreur_du_modele": false
   },
   {
     "file": "cas_03.png",
     "verite": "maligne",
-    "id": "malignant_9",
-    "erreur_du_modele": true
+    "id": "malignant_204",
+    "erreur_du_modele": false
   },
   {
     "file": "cas_04.png",
-    "verite": "normale",
-    "id": "normal_22",
+    "verite": "bénigne",
+    "id": "benign_189",
     "erreur_du_modele": false
   },
   {
     "file": "cas_05.png",
     "verite": "maligne",
-    "id": "malignant_47",
+    "id": "malignant_89",
     "erreur_du_modele": true
   },
   {
     "file": "cas_06.png",
-    "verite": "bénigne",
-    "id": "benign_44",
-    "erreur_du_modele": true
+    "verite": "normale",
+    "id": "normal_50",
+    "erreur_du_modele": false
   },
   {
     "file": "cas_07.png",
     "verite": "bénigne",
-    "id": "benign_56",
-    "erreur_du_modele": true
+    "id": "benign_247",
+    "erreur_du_modele": false
   },
   {
     "file": "cas_08.png",
-    "verite": "bénigne",
-    "id": "benign_59",
-    "erreur_du_modele": true
+    "verite": "normale",
+    "id": "normal_19",
+    "erreur_du_modele": false
   }
 ]

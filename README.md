@@ -1,4 +1,4 @@
-# 🎗️ SeinSûr
+# EchoBreast
 
 Aide à la **priorisation** des échographies mammaires (jeu public BUSI) — prototype du hackathon
 « Technologies et IA contre le cancer du sein », Octobre Rose.
@@ -9,25 +9,43 @@ Aide à la **priorisation** des échographies mammaires (jeu public BUSI) — pr
 
 | ID | Fonction | Où |
 |---|---|---|
-| F1–F2 | Import + prétraitement + contrôles qualité | `seinsur/core.py` |
+| F1–F2 | Import + prétraitement + contrôles qualité | `echobreast/core.py` |
 | F3 | Classification normale / bénigne / maligne (EfficientNet-B0) | `scripts/train_classifier.py` |
 | F4 | Contour de la zone suspecte (U-Net ResNet34) | `scripts/train_segmentation.py` |
-| F5, F7 | Code couleur prudent + indicateur de confiance | `seinsur/core.py` (`risk_level`) |
-| F6 | Grad-CAM | `seinsur/inference.py` |
+| F5, F7 | Code couleur prudent + indicateur de confiance | `echobreast/core.py` (`risk_level`) |
+| F6 | Grad-CAM | `echobreast/inference.py` |
 | F8 | Liste de priorité | page « Liste de priorité » |
-| F9 | Fiche PDF | `seinsur/report.py` |
+| F9 | Fiche PDF | `echobreast/report.py` |
 | F10 | Cas de démo (dont un cas d'erreur) | générés par `scripts/evaluate.py` |
-| F11–F15 | Accueil, Octobre Rose, ressources, consultation, Limites et sources | `app/app.py` |
+| F11–F15 | Octobre Rose, ressources, consultation, Fiabilité et limites | `app/app.py` |
+| + | Visionneuse : zoom/déplacement, zones numérotées, vue globale, loupe, Netteté, Comparer | `app/viewer.py` |
 
 Règle de couleur : **rouge** si p(maligne) ≥ `t_red` ; **orange** si p(maligne) ≥ `t_orange` *ou* confiance faible ;
 **vert** sinon. `t_orange` est fixé sur la validation pour atteindre ≥ 95 % de sensibilité sur les malins.
 
+## Visionneuse et zones à inspecter
+
+- **Zone suspecte** (trait plein lumineux, couleur du niveau) : contour prédit par le U-Net, lissé à pleine résolution.
+- **Zone d'attention** (pointillés roses) : région qui a le plus pesé dans la décision (Grad-CAM) mais située hors du
+  contour. À vérifier visuellement ; ce n'est pas une lésion confirmée.
+- Étiquettes cliquables sur l'image, puces de zones, ‹ › ou flèches du clavier : zoom animé sur la zone.
+  Molette / pincement : zoom ; glisser : déplacement ; **vue globale** quand on zoome ; **loupe** qui suit le curseur (touche L).
+- **Netteté** : réduction du grain de l'échographie (speckle, filtre non local), contraste local doux et agrandissement
+  Lanczos. **Comparer** : curseur avant/après entre l'image originale et la vue Netteté.
+  Ces vues sont signalées « Amélioration visuelle uniquement — l'analyse utilise l'image originale ».
+  Pas de super-résolution par IA : elle inventerait des détails, ce qui est dangereux en imagerie médicale.
+- **File de priorité** : filtres avec compteurs, recherche, aperçu rapide, statut « relu » (gardé pendant la session),
+  export PDF de la file.
+
 ## Arborescence
 
 ```
-seinsur/      code partagé (prétraitement, modèles, règle de couleur, PDF)
+echobreast/   code partagé (prétraitement, modèles, règle de couleur, zones, PDF)
 scripts/      préparation des données, entraînement, évaluation
-app/          application Streamlit (+ app/demo/ généré)
+app/app.py    pages : Analyser, File de priorité, Fiabilité & limites (+ Octobre Rose)
+app/ui.py     design system : couleurs, badges, icônes, jauge à seuils, cartes
+app/viewer.py visionneuse (zoom, zones, loupe, Netteté, Comparer)
+app/static/   polices embarquées (Newsreader, Inter, IBM Plex Mono), ruban, illustration
 models/       classifier.pt, segmenter.pt, settings.json, metrics.json
 docs/PITCH.md script minuté du pitch de 5 min
 ```
@@ -37,7 +55,7 @@ docs/PITCH.md script minuté du pitch de 5 min
 Prérequis : **Python 3.10 à 3.12** (python.org) et VS Code avec l'extension « Python ».
 
 ```bash
-# Dans le terminal de VS Code, dossier seinsur ouvert
+# Dans le terminal de VS Code, dossier echobreast ouvert
 python -m venv .venv
 # Windows :  .venv\Scripts\activate      Mac/Linux :  source .venv/bin/activate
 pip install -r requirements.txt          # ~2 Go, 5 à 15 min
@@ -63,7 +81,7 @@ streamlit run app/app.py                 # ouvre http://localhost:8501
 Le plus simple : ouvrir `notebooks/entrainement_colab.ipynb` dans Colab. Ou à la main :
 
 ```bash
-git clone <votre-depot> seinsur && cd seinsur
+git clone <votre-depot> echobreast && cd echobreast
 pip install -r requirements.txt
 # Télécharger Curated BUSI (Zenodo) ou BUSI d'origine, puis :
 python scripts/prepare_data.py --src /chemin/Dataset_BUSI_with_GT

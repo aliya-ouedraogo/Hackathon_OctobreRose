@@ -1,16 +1,52 @@
-[theme]
-base = "light"
-primaryColor = "#C2185B"
-backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#FCE4EC"
-textColor = "#333333"
-font = "sans serif"
-
 [server]
 maxUploadSize = 20
+enableStaticServing = true
 
 [browser]
 gatherUsageStats = false
 
 [client]
 toolbarMode = "viewer"
+
+[theme]
+base = "light"
+primaryColor = "#8E1D4A"
+backgroundColor = "#FBF4F8"
+secondaryBackgroundColor = "#F4EAF5"
+textColor = "#2A1F2C"
+linkColor = "#8E1D4A"
+borderColor = "#EFE1EA"
+baseRadius = "0.75rem"
+showSidebarBorder = true
+font = "Inter"
+headingFont = "Newsreader"
+codeFont = "IBM Plex Mono"
+
+[[theme.fontFaces]]
+family = "Inter"
+url = "/app/static/fonts/Inter-var.woff2"
+weight = "100 900"
+
+[[theme.fontFaces]]
+family = "Newsreader"
+url = "/app/static/fonts/Newsreader-var.woff2"
+weight = "200 800"
+
+[[theme.fontFaces]]
+family = "IBM Plex Mono"
+url = "/app/static/fonts/IBMPlexMono-400.woff2"
+weight = 400
+
+[[theme.fontFaces]]
+family = "IBM Plex Mono"
+url = "/app/static/fonts/IBMPlexMono-500.woff2"
+weight = 500
+
+[[theme.fontFaces]]
+family = "IBM Plex Mono"
+url = "/app/static/fonts/IBMPlexMono-600.woff2"
+weight = 600
+
+[theme.sidebar]
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F4EAF5"

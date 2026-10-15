@@ -1,106 +1,132 @@
 {
   "date": "2026-10-15",
-  "n_test": 22,
+  "n_test": 111,
   "n_test_par_classe": {
-    "normale": 6,
-    "bénigne": 9,
-    "maligne": 7
+    "normale": 17,
+    "bénigne": 61,
+    "maligne": 33
   },
-  "auc_maligne": 0.35238095238095235,
+  "auc_maligne": 0.9277389277389279,
   "roc": {
     "fpr": [
       0.0,
-      0.0667,
-      0.2,
-      0.2,
-      0.6,
-      0.6,
-      0.8,
-      0.8,
-      0.9333,
-      0.9333,
+      0.0,
+      0.0,
+      0.0256,
+      0.0256,
+      0.0385,
+      0.0385,
+      0.0897,
+      0.0897,
+      0.1026,
+      0.1026,
+      0.1154,
+      0.1154,
+      0.1923,
+      0.1923,
+      0.2179,
+      0.2179,
+      0.2564,
+      0.2564,
+      0.3846,
+      0.3846,
+      0.4487,
+      0.4487,
       1.0
     ],
     "tpr": [
       0.0,
-      0.0,
-      0.0,
-      0.1429,
-      0.1429,
-      0.5714,
-      0.5714,
-      0.8571,
-      0.8571,
+      0.0303,
+      0.5758,
+      0.5758,
+      0.6061,
+      0.6061,
+      0.6364,
+      0.6364,
+      0.697,
+      0.697,
+      0.7879,
+      0.7879,
+      0.8182,
+      0.8182,
+      0.8485,
+      0.8485,
+      0.9091,
+      0.9091,
+      0.9394,
+      0.9394,
+      0.9697,
+      0.9697,
       1.0,
       1.0
     ]
   },
-  "exactitude_3_classes": 0.2727272727272727,
+  "exactitude_3_classes": 0.7927927927927928,
   "matrice_confusion": [
     [
-      6,
-      0,
+      12,
+      5,
       0
     ],
     [
-      9,
-      0,
-      0
+      2,
+      49,
+      10
     ],
     [
-      7,
-      0,
-      0
+      3,
+      3,
+      27
     ]
   ],
   "par_classe": {
     "normale": {
-      "sensibilite": 1.0,
-      "specificite": 0.0
+      "sensibilite": 0.7058823529411765,
+      "specificite": 0.9468085106382979
     },
     "bénigne": {
-      "sensibilite": 0.0,
-      "specificite": 1.0
+      "sensibilite": 0.8032786885245902,
+      "specificite": 0.84
     },
     "maligne": {
-      "sensibilite": 0.0,
-      "specificite": 1.0
+      "sensibilite": 0.8181818181818182,
+      "specificite": 0.8717948717948718
     }
   },
   "alerte_orange_ou_rouge": {
-    "sensibilite_maligne": 1.0,
-    "specificite": 0.0
+    "sensibilite_maligne": 0.9393939393939394,
+    "specificite": 0.6025641025641025
   },
   "alerte_rouge": {
-    "sensibilite_maligne": 0.0,
-    "specificite": 1.0
+    "sensibilite_maligne": 0.8181818181818182,
+    "specificite": 0.8205128205128205
   },
-  "malins_classes_vert": 0,
+  "malins_classes_vert": 2,
   "couleurs_par_classe_reelle": {
     "normale": {
-      "vert": 0,
+      "vert": 10,
       "orange": 6,
-      "rouge": 0
+      "rouge": 1
     },
     "bénigne": {
-      "vert": 0,
-      "orange": 9,
-      "rouge": 0
+      "vert": 37,
+      "orange": 11,
+      "rouge": 13
     },
     "maligne": {
-      "vert": 0,
-      "orange": 7,
-      "rouge": 0
+      "vert": 2,
+      "orange": 4,
+      "rouge": 27
     }
   },
-  "ece_avant_calibration": 0.5823811617764559,
-  "ece_apres_calibration": 0.08906085111878137,
-  "dice": 0.9423190434259263,
-  "iou": 0.8922644627744662,
+  "ece_avant_calibration": 0.15150242614316511,
+  "ece_apres_calibration": 0.05268069215722985,
+  "dice": 0.7767067153137862,
+  "iou": 0.6969541119040037,
   "seuils": {
-    "temperature": 20.0,
-    "t_orange": 0.3185359372367859,
-    "t_red": 0.3685359372367859,
+    "temperature": 2.5263888835906982,
+    "t_orange": 0.09067081497812271,
+    "t_red": 0.3252963423728943,
     "sensibilite_visee_validation": 0.95
   }
 }

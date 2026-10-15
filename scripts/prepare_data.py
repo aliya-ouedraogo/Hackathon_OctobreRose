@@ -27,7 +27,7 @@ import numpy as np
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from seinsur.core import CLASSES, FOLDERS, ROOT  # noqa: E402
+from echobreast.core import CLASSES, FOLDERS, ROOT  # noqa: E402
 
 IMG_EXT = {".png", ".jpg", ".jpeg", ".bmp"}
 

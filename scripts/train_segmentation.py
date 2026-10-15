@@ -18,8 +18,8 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from seinsur.core import MODELS_DIR, build_segmenter  # noqa: E402
-from seinsur.data import BusiDataset  # noqa: E402
+from echobreast.core import MODELS_DIR, build_segmenter  # noqa: E402
+from echobreast.data import BusiDataset  # noqa: E402
 
 
 def dice_loss(logits, target, eps=1.0):

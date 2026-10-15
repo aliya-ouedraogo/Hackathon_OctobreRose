@@ -1,10 +1,10 @@
 {
-  "temperature": 20.0,
-  "t_orange": 0.3185359372367859,
-  "t_red": 0.3685359372367859,
+  "temperature": 2.5263888835906982,
+  "t_orange": 0.09067081497812271,
+  "t_red": 0.3252963423728943,
   "min_confidence": 0.35,
   "cls_arch": "efficientnet_b0",
   "seg_encoder": "resnet34",
-  "model_version": "SYNTHETIQUE - test technique",
+  "model_version": "2026-10-15",
   "extra": {}
 }

@@ -1,7 +1,7 @@
-# SeinSûr — Pitch de 5 minutes
+# EchoBreast — Pitch de 5 minutes
 
 > Phrase-clé à répéter au début ET à la fin :
-> **« SeinSûr aide les professionnels à décider quoi relire en premier ; il ne décide jamais à leur place. »**
+> **« EchoBreast aide les professionnels à décider quoi relire en premier ; il ne décide jamais à leur place. »**
 
 Rôles conseillés : **A** = orateur·rice principal·e, **B** = pilote de la démo (clavier). B a la démo ouverte
 *avant* de monter sur scène (onglet « Analyse » chargé, cas 1 sélectionné) et la vidéo de secours prête.
@@ -21,10 +21,10 @@ Rôles conseillés : **A** = orateur·rice principal·e, **B** = pilote de la d�
 🖼 Diapo 1 : un seul chiffre en très gros + ruban rose.
 ⚠️ Ne dire **que** des chiffres vérifiés, avec source et année affichées sur la diapo.
 
-## 0:40 – 1:10 · Où intervient SeinSûr (A) — 30 s
+## 0:40 – 1:10 · Où intervient EchoBreast (A) — 30 s
 
 > « Le parcours, c'est : examen clinique → **échographie** → prélèvement → laboratoire → traitement.
-> SeinSûr intervient ici, à l'échographie : il **trie la pile** d'examens du plus au moins urgent à relire.
+> EchoBreast intervient ici, à l'échographie : il **trie la pile** d'examens du plus au moins urgent à relire.
 > Il ne pose aucun diagnostic. »
 
 🖼 Diapo 2 : le parcours en 5 pictos, l'étape « échographie » surlignée en rose.
@@ -41,7 +41,7 @@ Rôles conseillés : **A** = orateur·rice principal·e, **B** = pilote de la d�
    > qu'un cancer manqué. »
 
 3. **Liste de priorité (≈ 45 s)** — onglet Liste → « Utiliser tous les cas de démo ».
-   > « Lundi matin, 30 échographies. SeinSûr les classe : rouges en haut, puis orange, puis vert.
+   > « Lundi matin, 30 échographies. EchoBreast les classe : rouges en haut, puis orange, puis vert.
    > C'est l'idée du tri par score de risque évaluée dans l'essai suédois MASAI en mammographie —
    > nous, en version légère, sur un simple ordinateur, sans GPU. »
 
@@ -70,7 +70,7 @@ Onglet **Limites et sources** à l'écran.
 > dans un cadre éthique**, évaluer avec des radiologues, puis une version **hors ligne**.
 > La même méthode peut servir pour la mammographie, le col de l'utérus ou le paludisme.
 >
-> SeinSûr aide les professionnels à décider quoi relire en premier ; **il ne décide jamais à leur place.**
+> EchoBreast aide les professionnels à décider quoi relire en premier ; **il ne décide jamais à leur place.**
 > Merci. »
 
 🖼 Diapo finale : logo, phrase-clé, QR code vers la démo en ligne, noms de l'équipe.
