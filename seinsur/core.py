@@ -1,0 +1,150 @@
+"""Briques communes : modèles, prétraitement, calibration, code couleur.
+
+Utilisé à la fois par les scripts d'entraînement et par l'application,
+pour garantir que l'image est traitée exactement de la même façon.
+"""
+from __future__ import annotations
+
+import json
+import math
+from dataclasses import dataclass, field
+from pathlib import Path
+
+import numpy as np
+from PIL import Image
+
+CLASSES = ["normale", "bénigne", "maligne"]
+FOLDERS = ["normal", "benign", "malignant"]  # noms des dossiers BUSI
+MALIGNE = 2
+
+CLS_SIZE = 224
+SEG_SIZE = 256
+MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+
+ROOT = Path(__file__).resolve().parent.parent
+MODELS_DIR = ROOT / "models"
+
+
+# --------------------------------------------------------------------------
+# Prétraitement (F2)
+# --------------------------------------------------------------------------
+def load_gray(path_or_file) -> Image.Image:
+    return Image.open(path_or_file).convert("L")
+
+
+def to_tensor_input(img: Image.Image, size: int) -> np.ndarray:
+    """Image niveaux de gris -> tableau (3, size, size) normalisé ImageNet."""
+    arr = np.asarray(img.convert("L").resize((size, size), Image.BILINEAR), dtype=np.float32) / 255.0
+    arr = np.repeat(arr[None], 3, axis=0)
+    return (arr - MEAN[:, None, None]) / STD[:, None, None]
+
+
+def quality_warnings(raw: Image.Image) -> list[str]:
+    """Contrôles simples pour signaler une image manifestement inadaptée."""
+    warnings = []
+    w, h = raw.size
+    if min(w, h) < 128:
+        warnings.append(f"Image très petite ({w}×{h} px) : résultat peu fiable.")
+    rgb = np.asarray(raw.convert("RGB"), dtype=np.float32)
+    if np.abs(rgb[..., 0] - rgb[..., 1]).mean() + np.abs(rgb[..., 1] - rgb[..., 2]).mean() > 20:
+        warnings.append("Image en couleur : une échographie est normalement en niveaux de gris.")
+    mean = rgb.mean()
+    if mean < 15:
+        warnings.append("Image très sombre.")
+    elif mean > 200:
+        warnings.append("Image très claire : est-ce bien une échographie ?")
+    return warnings
+
+
+# --------------------------------------------------------------------------
+# Modèles
+# --------------------------------------------------------------------------
+def build_classifier(arch: str = "efficientnet_b0", pretrained: bool = True):
+    import timm
+
+    return timm.create_model(arch, pretrained=pretrained, num_classes=len(CLASSES))
+
+
+def build_segmenter(encoder: str = "resnet34", pretrained: bool = True):
+    import segmentation_models_pytorch as smp
+
+    return smp.Unet(
+        encoder_name=encoder,
+        encoder_weights="imagenet" if pretrained else None,
+        in_channels=3,
+        classes=1,
+    )
+
+
+# --------------------------------------------------------------------------
+# Calibration, confiance et code couleur (F5, F7)
+# --------------------------------------------------------------------------
+def softmax(logits: np.ndarray, temperature: float = 1.0) -> np.ndarray:
+    z = logits / temperature
+    z = z - z.max(axis=-1, keepdims=True)
+    e = np.exp(z)
+    return e / e.sum(axis=-1, keepdims=True)
+
+
+def confidence(probs: np.ndarray) -> float:
+    """1 - entropie normalisée : 1 = certain, 0 = totalement indécis."""
+    p = np.clip(probs, 1e-12, 1.0)
+    return float(1.0 - (-(p * np.log(p)).sum()) / math.log(len(p)))
+
+
+@dataclass
+class Settings:
+    """Réglages fixés sur le jeu de VALIDATION par scripts/evaluate.py."""
+
+    temperature: float = 1.0
+    t_orange: float = 0.10   # p(maligne) au-delà de laquelle on relit (sensibilité ≥ 95 %)
+    t_red: float = 0.50      # p(maligne) au-delà de laquelle c'est prioritaire
+    min_confidence: float = 0.35
+    cls_arch: str = "efficientnet_b0"
+    seg_encoder: str = "resnet34"
+    model_version: str = "non entraîné"
+    extra: dict = field(default_factory=dict)
+
+    @classmethod
+    def load(cls, path: Path = MODELS_DIR / "settings.json") -> "Settings":
+        if not path.exists():
+            return cls()
+        data = json.loads(path.read_text(encoding="utf-8"))
+        known = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
+        return cls(**known)
+
+    def save(self, path: Path = MODELS_DIR / "settings.json") -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(self.__dict__, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+LEVELS = {
+    "rouge": {"rank": 0, "icon": "🔴", "label": "Prioritaire", "color": "#B3261E",
+              "text": "Probabilité élevée de malignité selon le modèle : à traiter en priorité."},
+    "orange": {"rank": 1, "icon": "🟠", "label": "À relire", "color": "#E07B00",
+               "text": "Zone d'incertitude : relecture prioritaire recommandée."},
+    "vert": {"rank": 2, "icon": "🟢", "label": "Risque faible", "color": "#2E7D32",
+             "text": "Risque faible selon le modèle — ce n'est pas une absence de maladie."},
+}
+
+
+def risk_level(probs: np.ndarray, s: Settings) -> tuple[str, list[str]]:
+    """Règle prudente : en cas de doute, on classe en orange."""
+    reasons = []
+    p_mal = float(probs[MALIGNE])
+    conf = confidence(probs)
+    if p_mal >= s.t_red:
+        return "rouge", [f"p(maligne) = {p_mal:.0%} ≥ seuil rouge {s.t_red:.0%}"]
+    if p_mal >= s.t_orange:
+        reasons.append(f"p(maligne) = {p_mal:.0%} ≥ seuil de prudence {s.t_orange:.0%}")
+    if conf < s.min_confidence:
+        reasons.append("Résultat peu fiable (confiance faible), relecture prioritaire")
+    if reasons:
+        return "orange", reasons
+    return "vert", [f"p(maligne) = {p_mal:.0%} < seuil de prudence {s.t_orange:.0%}"]
+
+
+def priority_key(level: str, probs: np.ndarray) -> tuple:
+    """Tri de la liste de priorité : couleur d'abord, puis p(maligne) décroissante."""
+    return (LEVELS[level]["rank"], -float(probs[MALIGNE]))
