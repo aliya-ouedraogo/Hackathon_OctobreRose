@@ -26,7 +26,7 @@ Règle de couleur : **rouge** si p(maligne) ≥ `t_red` ; **orange** si p(malign
 ## Visionneuse et zones à inspecter
 
 - **Zone suspecte** (trait plein lumineux, couleur du niveau) : contour prédit par le U-Net, lissé à pleine résolution.
-- **Zone d'attention** (pointillés roses) : région qui a le plus pesé dans la décision (Grad-CAM) mais située hors du
+- **Où l'IA a regardé** (pointillés roses) : endroits qui ont le plus influencé le résultat (Grad-CAM), hors du
   contour. À vérifier visuellement ; ce n'est pas une lésion confirmée.
 - Étiquettes cliquables sur l'image, puces de zones, ‹ › ou flèches du clavier : zoom animé sur la zone.
   Molette / pincement : zoom ; glisser : déplacement ; **vue globale** quand on zoome ; **loupe** qui suit le curseur (touche L).

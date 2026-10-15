@@ -1,4 +1,4 @@
-"""EchoBreast — application Streamlit.
+"""EchoBreast : application Streamlit.
 
 Lancer :  streamlit run app/app.py
 """
@@ -53,7 +53,7 @@ def analyze_bytes(data: bytes):
 
 
 def viewer_assets(key: str):
-    """Vues d'affichage (originale, Netteté), carte d'attention et zones — calculées une seule fois."""
+    """Vues d'affichage (originale, Netteté), carte d'attention et zones, calculées une seule fois."""
     from echobreast.inference import enhance_for_display, find_zones, heat_rgba
 
     entry = _cache()[key]
@@ -98,6 +98,46 @@ def meta(entry: dict, demo: bool) -> str:
 
 
 # --------------------------------------------------------------------------
+# Guide de lecture (fenêtre)
+# --------------------------------------------------------------------------
+@st.dialog("Comment lire un résultat", width="large")
+def reading_guide(settings):
+    st.markdown(f"""
+#### 1. La couleur : dans quel ordre relire
+| | Signification | Que faire |
+|---|---|---|
+| **Prioritaire** (rouge) | Le modèle trouve l'image très évocatrice d'un cancer. | Relire en premier. |
+| **À relire** (orange) | Résultat incertain, ou risque au-dessus du seuil de vigilance. | Relire rapidement. |
+| **Risque faible** (vert) | Peu de signes inquiétants pour le modèle. | Relire normalement. Ce n'est pas un « normal » garanti. |
+
+#### 2. Le pourcentage : le risque estimé de cancer
+C'est l'estimation, par le modèle, du risque que la lésion soit un cancer. Avec **30 %**, cela veut dire que lors des tests,
+sur 100 images ayant ce score, environ 30 étaient réellement des cancers. Ce n'est **pas** un diagnostic.
+
+#### 3. Les deux seuils
+- **Seuil de vigilance ({settings.t_orange:.0%})** : au-dessus, l'examen passe en orange. Il est volontairement bas pour ne laisser
+  passer presque aucun cancer, quitte à créer des fausses alertes.
+- **Seuil prioritaire ({settings.t_red:.0%})** : au-dessus, l'examen passe en rouge.
+- Si le modèle **hésite** entre plusieurs réponses, l'examen passe en orange par prudence, même avec un faible pourcentage.
+
+#### 4. Les tracés sur l'image
+- **Trait plein** (couleur du niveau) : contour de la lésion repérée par le modèle. Son nom suit la couleur :
+  « Zone suspecte » en rouge, « Zone à vérifier » en orange, « Lésion d'aspect bénin » en vert.
+  Un contour en vert ne signale donc pas un danger : le modèle a vu une lésion qu'il juge plutôt bénigne.
+- **Pointillés roses**, bouton « Où l'IA a regardé » : endroits de l'image qui ont le plus influencé le résultat.
+  **À quoi ça sert ?** À vérifier que l'IA s'est appuyée sur la lésion et pas sur autre chose. Si elle regarde surtout un bord
+  de l'image, une inscription ou une ombre, son résultat est moins crédible. Ces zones ne sont pas des lésions confirmées.
+
+#### 5. Netteté et Comparer
+Ces vues réduisent le grain de l'échographie pour mieux voir. Elles servent **uniquement à l'œil** :
+le modèle analyse toujours l'image originale.
+
+#### 6. Ce que l'outil ne fait pas
+Il ne pose pas de diagnostic, ne mesure pas la taille en mm et n'a pas été validé sur des patientes du Burkina Faso.
+**La décision appartient toujours au professionnel de santé.**""")
+
+
+# --------------------------------------------------------------------------
 # Page : Analyser
 # --------------------------------------------------------------------------
 def page_analyse():
@@ -105,7 +145,7 @@ def page_analyse():
     h, ctl = st.columns([1.25, 1], vertical_alignment="bottom")
     with h:
         ui.header("Lecture assistée", "Analyser une échographie",
-                  "Estimation du niveau de priorité et repérage des zones à inspecter. La décision reste au professionnel.")
+                  "L'IA indique dans quel ordre relire les examens et montre les zones à regarder. La décision reste au professionnel.")
     if need_models():
         return
     an = get_analyzer()
@@ -147,6 +187,14 @@ def page_analyse():
     for w in res.warnings:
         st.warning(w, icon=":material/warning:")
 
+    lg, gb = st.columns([5, 1.15], vertical_alignment="center")
+    with lg:
+        ui.legend()
+    with gb:
+        if st.button("Guide de lecture", icon=":material/menu_book:", type="primary", use_container_width=True):
+            reading_guide(an.settings)
+    st.write("")
+
     left, right = st.columns([1.7, 1], gap="medium")
     with left:
         with st.spinner("Préparation de la visionneuse…"):
@@ -154,7 +202,7 @@ def page_analyse():
         from viewer import render_viewer
 
         render_viewer(assets["base"], assets["sharp"], assets["heat"], assets["zones"], raw.size,
-                      LEVELS[res.level]["color"], height=760)
+                      res.level, height=760)
     with right:
         ui.triage_card(res, an.settings)
         ui.probs_card(res, an.settings)
@@ -172,14 +220,6 @@ def page_analyse():
                 if truth.get("erreur_du_modele"):
                     st.markdown("Ce cas est montré **volontairement** : le modèle s'y trompe. "
                                 "C'est pour cela que la décision reste au professionnel.")
-        with st.popover("Comment lire ce résultat ?", icon=":material/help:", use_container_width=True):
-            st.markdown(f"""
-- **Probabilité de malignité** : sortie calibrée du modèle, pas un diagnostic.
-- **Rouge** si elle dépasse {an.settings.t_red:.0%} ; **orange** au-delà du seuil de prudence ({an.settings.t_orange:.0%}),
-  fixé pour viser au moins 95 % des cas malins signalés, ou si la confiance est faible ; **vert** sinon.
-- **Zone suspecte** : contour proposé par le modèle de segmentation.
-- **Zone d'attention** : région qui a pesé dans la décision, hors contour, à vérifier à l'œil.
-- **Netteté / Comparer** : amélioration **visuelle uniquement** ; l'analyse porte toujours sur l'image originale.""")
 
 
 # --------------------------------------------------------------------------
@@ -251,7 +291,7 @@ def page_priorite():
     left, right = st.columns([1.75, 1], gap="medium")
     with left:
         st.markdown("<div class='eb-qhead'><span>Rang</span><span>Coupe</span><span>Examen</span>"
-                    "<span class='st'>Statut IA</span><span class='pm'>p(maligne)</span><span></span></div>",
+                    "<span class='st'>Niveau</span><span class='pm'>Risque estimé</span><span></span></div>",
                     unsafe_allow_html=True)
         if not shown:
             st.caption("Aucun examen pour ce filtre.")
@@ -266,7 +306,7 @@ def page_priorite():
 <span class='rk {'top' if rank == 1 else ''}'>{rank:02d}</span><img src='{r['entry']['thumb']}' alt='Miniature'>
 <div style='min-width:0'><div class='ref'>{html.escape(r['name'])}{' ✓' if r['relu'] else ''}</div><div class='meta'>{meta(r['entry'], r['demo'])}</div></div>
 <div class='st'>{ui.badge(res.level, 'sm')}</div>
-<div class='pm'><b>{res.p_malignant * 100:.0f} %</b> <span class='eb-chip {conf_key}'>{conf_lbl}</span>
+<div class='pm'><b>{ui.pct(res.p_malignant)}</b> <span class='eb-chip {conf_key}'>certitude {conf_lbl.lower()}</span>
 <div class='eb-track'><div style='width:{res.p_malignant * 100:.0f}%;background:{lv['color']}'></div></div></div><span></span></div>""",
                            unsafe_allow_html=True)
                 if b.button("›" if not sel else "●", key=f"sel_{r['key']}", type="primary" if sel else "secondary",
@@ -275,12 +315,13 @@ def page_priorite():
                     st.rerun()
         avg = sum(r["res"].p_malignant for r in rows) / len(rows)
         st.markdown(f"<div style='color:var(--muted);font-size:.85rem;margin-top:.4rem'>Affichage de <b>{len(shown)}</b> sur "
-                    f"{len(rows)} examens · <span class='eb-mono'>moyenne p(maligne) : {avg:.1%}</span></div>",
+                    f"{len(rows)} examens · <span class='eb-mono'>risque moyen : {avg:.0%}</span></div>",
                     unsafe_allow_html=True)
 
     with right:
         r = next(x for x in rows if x["key"] == sel_key)
         res, lv, entry = r["res"], LEVELS[r["res"].level], r["entry"]
+        conf_lbl, _ = ui.confidence_level(res.confidence, an.settings.min_confidence)
         n_zones = len(find_zones(res.mask, None, (entry["raw"].height, entry["raw"].width)))
         crit = "".join(f"<div class='eb-crit'>{ui.icon('triangle-alert', 16, lv['color'])}<span>{html.escape(x)}</span></div>"
                        for x in res.reasons)
@@ -289,9 +330,9 @@ def page_priorite():
                         f"font-size:1.2rem'>Aperçu rapide · {html.escape(r['name'])}</h3>", unsafe_allow_html=True)
             st.image(entry["preview"], use_container_width=True)
             st.markdown(f"""<div class='eb-row' style='margin-top:.6rem'>{ui.badge(res.level, 'sm')}
-<span class='eb-big' style='font-size:2rem'>{res.p_malignant * 100:.0f}&thinsp;%</span></div>{crit}
-<div class='eb-row' style='margin-top:.8rem;color:var(--muted);font-size:.86rem'><span>{n_zones} zone(s) suspecte(s) détourée(s)</span>
-<span class='eb-mono'>confiance {res.confidence:.2f}</span></div>""", unsafe_allow_html=True)
+<span class='eb-big' style='font-size:2rem'>{ui.pct(res.p_malignant, '&thinsp;')}</span></div>{crit}
+<div class='eb-row' style='margin-top:.8rem;color:var(--muted);font-size:.86rem'><span>{n_zones} lésion(s) repérée(s)</span>
+<span>certitude du modèle : {conf_lbl.lower()}</span></div>""", unsafe_allow_html=True)
             st.write("")
             if st.button("Ouvrir dans la visionneuse complète", type="primary", icon=":material/open_in_new:",
                          use_container_width=True):
@@ -309,7 +350,7 @@ def page_priorite():
 # Page : Fiabilité et limites
 # --------------------------------------------------------------------------
 def pct(x, d=1):
-    return "—" if x is None else f"{x * 100:.{d}f} %"
+    return "n.d." if x is None else f"{x * 100:.{d}f} %"
 
 
 def page_limites():
@@ -317,7 +358,7 @@ def page_limites():
     m = load_metrics()
     an = get_analyzer()
     ui.header("Transparence et évaluation", "Fiabilité & limites",
-              "Ce que le modèle sait faire, mesuré une seule fois sur un jeu de test jamais vu — et ce qu'il ne faut pas lui demander.")
+              "Ce que le modèle sait faire, mesuré une seule fois sur un jeu de test jamais vu, et ce qu'il ne faut pas lui demander.")
     if m is None:
         st.info("Mesures pas encore calculées (`scripts/evaluate.py`). Aucun chiffre n'est affiché tant qu'il n'est pas mesuré.")
     else:
@@ -325,13 +366,14 @@ def page_limites():
         tag = "<span class='eb-tag'>Test interne</span>"
         cols = st.columns(4)
         cards = [
-            ui.stat("Sensibilité", pct(a["sensibilite_maligne"]), ci.get("sensibilite"),
-                    "Part des cas malins signalés orange ou rouge.", tag),
-            ui.stat("Spécificité", pct(a["specificite"]), ci.get("specificite"),
-                    "Part des cas non malins laissés en vert."),
-            ui.stat("AUC-ROC", f"{m['auc_maligne']:.3f}", None, "Capacité à classer les malins avant les autres."),
-            ui.stat("Indice Dice", "—" if m["dice"] is None else f"{m['dice']:.3f}", None,
-                    "Recouvrement entre contour prédit et contour de référence."),
+            ui.stat("Cancers signalés (sensibilité)", pct(a["sensibilite_maligne"], 0), ci.get("sensibilite"),
+                    "Sur 100 cancers, combien l'outil met en orange ou en rouge.", tag),
+            ui.stat("Images saines laissées en vert (spécificité)", pct(a["specificite"], 0), ci.get("specificite"),
+                    "Sur 100 images sans cancer, combien ne déclenchent pas d'alerte."),
+            ui.stat("Qualité du tri (AUC)", f"{m['auc_maligne']:.2f}".replace(".", ","), None,
+                    "Capacité à placer les cancers avant les autres images. 1 = tri parfait, 0,5 = hasard."),
+            ui.stat("Précision du contour (Dice)", "n.d." if m["dice"] is None else f"{m['dice']:.2f}".replace(".", ","), None,
+                    "Ressemblance entre le contour tracé par l'IA et celui de l'expert. 1 = identique."),
         ]
         for col, card in zip(cols, cards):
             col.markdown(card, unsafe_allow_html=True)
@@ -339,7 +381,7 @@ def page_limites():
 
         mx = m.get("matrice_alerte")
         with st.container(border=True):
-            st.markdown(f"<div class='eb-row'><h3 class='eb-serif' style='margin:0;font-size:1.35rem'>Matrice de confusion & calibration</h3>"
+            st.markdown(f"<div class='eb-row'><h3 class='eb-serif' style='margin:0;font-size:1.35rem'>Résultats détaillés sur les images de test</h3>"
                         f"<span class='eb-tag'>N = {m['n_test']}</span></div><div style='color:var(--muted);font-size:.9rem;margin:.2rem 0 .9rem'>"
                         f"Jeu de test BUSI séparé avant l'entraînement ({', '.join(f'{k} : {v}' for k, v in m['n_test_par_classe'].items())}), "
                         f"mesuré le {m['date']}.</div>", unsafe_allow_html=True)
@@ -348,26 +390,26 @@ def page_limites():
                 if mx:
                     tp, fn, fp, tn = mx["vp"], mx["fn"], mx["fp"], mx["vn"]
                     P, N = tp + fn, fp + tn
-                    st.markdown(f"""<div class='eb-row' style='margin-bottom:.5rem'><b style='font-weight:600'>Décision au seuil de prudence</b>
-<span class='eb-mono' style='font-size:.8rem;color:var(--muted)'>seuil {m['seuils']['t_orange']:.2f}</span></div>
-<div class='eb-mx'><span class='h'>Réel \\ Signalé</span><span class='h' style='color:var(--wine)'>Orange/rouge</span><span class='h'>Vert</span><span class='h tot'>Total</span>
-<span>Maligne</span><span class='c' style='background:#8E1D4A;color:#fff'>{tp}<small>VP ({tp / max(P, 1):.1%})</small></span>
-<span class='c' style='background:#F7DDE6;color:#C8264E'>{fn}<small>FN ({fn / max(P, 1):.1%})</small></span><span class='tot eb-mono'>{P}</span>
-<span>Bénigne / normale</span><span class='c' style='background:#EADCF0;color:#5B2A6E'>{fp}<small>FP ({fp / max(N, 1):.1%})</small></span>
-<span class='c' style='background:#F4EAF5;color:#2A1F2C'>{tn}<small>VN ({tn / max(N, 1):.1%})</small></span><span class='tot eb-mono'>{N}</span></div>
-<p style='color:var(--muted);font-size:.86rem;margin:.7rem 0 0'>Les faux négatifs (FN) sont les cancers que le modèle aurait laissés en vert :
-c'est le chiffre à surveiller en priorité.</p>""", unsafe_allow_html=True)
+                    st.markdown(f"""<div class='eb-row' style='margin-bottom:.5rem'><b style='font-weight:600'>Ce que l'outil a signalé</b>
+<span style='font-size:.8rem;color:var(--muted)'>au seuil de vigilance ({m['seuils']['t_orange']:.0%})</span></div>
+<div class='eb-mx'><span class='h'>Réalité \\ Couleur</span><span class='h' style='color:var(--wine)'>Orange ou rouge</span><span class='h'>Vert</span><span class='h tot'>Total</span>
+<span>Cancer</span><span class='c' style='background:#8E1D4A;color:#fff'>{tp}<small>bien signalés</small></span>
+<span class='c' style='background:#F7DDE6;color:#C8264E'>{fn}<small>manqués</small></span><span class='tot eb-mono'>{P}</span>
+<span>Pas de cancer</span><span class='c' style='background:#EADCF0;color:#5B2A6E'>{fp}<small>fausses alertes</small></span>
+<span class='c' style='background:#F4EAF5;color:#2A1F2C'>{tn}<small>bien laissés en vert</small></span><span class='tot eb-mono'>{N}</span></div>
+<p style='color:var(--muted);font-size:.86rem;margin:.7rem 0 0'>Les cancers « manqués » sont ceux que l'outil aurait laissés en vert : c'est le chiffre le plus important.
+Les fausses alertes coûtent une relecture de plus, mais ne font pas rater de cancer.</p>""", unsafe_allow_html=True)
             with r:
                 import altair as alt
                 import pandas as pd
 
                 cal = pd.DataFrame(m.get("calibration_maligne", []))
-                st.markdown(f"<div class='eb-row'><b style='font-weight:600'>Calibration des probabilités</b>"
-                            f"<span class='eb-mono' style='font-size:.8rem;color:var(--wine)'>Brier : {m.get('brier_maligne', float('nan')):.3f}</span></div>",
+                st.markdown(f"<div class='eb-row'><b style='font-weight:600'>Les pourcentages annoncés sont-ils justes ?</b>"
+                            "</div>",
                             unsafe_allow_html=True)
                 diag = alt.Chart(pd.DataFrame({"x": [0, 1], "y": [0, 1]})).mark_line(strokeDash=[4, 4], color="#CDB7C6").encode(
-                    x=alt.X("x", title="Probabilité prédite", scale=alt.Scale(domain=[0, 1]), axis=alt.Axis(format="%")),
-                    y=alt.Y("y", title="Fréquence observée", scale=alt.Scale(domain=[0, 1]), axis=alt.Axis(format="%")))
+                    x=alt.X("x", title="Risque annoncé par l'IA", scale=alt.Scale(domain=[0, 1]), axis=alt.Axis(format="%")),
+                    y=alt.Y("y", title="Cancers réellement observés", scale=alt.Scale(domain=[0, 1]), axis=alt.Axis(format="%")))
                 chart = diag
                 if not cal.empty:
                     base = alt.Chart(cal).encode(x="predite", y="observee", tooltip=["predite", "observee", "n"])
@@ -375,8 +417,8 @@ c'est le chiffre à surveiller en priorité.</p>""", unsafe_allow_html=True)
                 st.altair_chart(chart.properties(height=230).configure_view(strokeWidth=0)
                                 .configure_axis(labelColor="#6F6271", titleColor="#6F6271", gridColor="#F1E6EE"),
                                 use_container_width=True)
-                st.caption(f"Plus la courbe suit la diagonale, plus les pourcentages affichés sont fiables. "
-                           f"ECE : {m['ece_avant_calibration']:.3f} avant → {m['ece_apres_calibration']:.3f} après calibration.")
+                st.caption(f"Si la courbe suit la diagonale, un risque annoncé de 30 % correspond bien à environ 30 cancers sur 100 images. "
+                           f"Écart moyen constaté : {m['ece_apres_calibration'] * 100:.0f} points.")
 
     st.write("")
     with st.container(border=True):
@@ -406,7 +448,7 @@ c'est le chiffre à surveiller en priorité.</p>""", unsafe_allow_html=True)
                ("eye", "Zones d'attention", "Elles montrent ce qui a influencé le modèle, pas une lésion confirmée."),
                ("image-up", "Netteté = affichage", "Réduction du grain et agrandissement pour l'œil humain uniquement ; "
                 "l'analyse porte sur l'image originale."),
-               ("info", "Petit jeu déséquilibré", "Seulement 210 images malignes : les intervalles de confiance sont larges.")]
+               ("info", "Petit jeu déséquilibré", "Seulement 210 images de cancers : les chiffres ont une marge d'incertitude importante.")]
         for i in range(0, len(lim), 3):
             cols = st.columns(3)
             for col, (ic, t, d) in zip(cols, lim[i:i + 3]):
@@ -432,7 +474,7 @@ c'est le chiffre à surveiller en priorité.</p>""", unsafe_allow_html=True)
                           mime="application/json", type="primary", icon=":material/download:", use_container_width=True)
     with st.expander("Références"):
         st.markdown(f"""
-- Al-Dhabyani W. et al. (2020), *Dataset of breast ultrasound images*, Data in Brief — jeu BUSI ; version corrigée Curated BUSI (Zenodo).
+- Al-Dhabyani W. et al. (2020), *Dataset of breast ultrasound images*, Data in Brief : jeu BUSI ; version corrigée Curated BUSI (Zenodo).
 - Essai **MASAI** (Université de Lund, *The Lancet*) : triage de mammographies par score de risque assisté par IA.
 - **Koios DS Breast** : aide à l'interprétation d'échographies mammaires autorisée par la FDA.
 - Selvaraju et al. (2017) Grad-CAM · Ronneberger et al. (2015) U-Net · Tan & Le (2019) EfficientNet · OMS.
@@ -451,32 +493,76 @@ QUESTIONS = [
     "Qui contacter si j'ai une question après le rendez-vous ?",
     "Mes antécédents familiaux changent-ils quelque chose ?",
     "Comment faire l'auto-examen des seins ?",
+    "Dois-je faire un dépistage du cancer du col de l'utérus ? À quel rythme ?",
+    "Ma fille peut-elle être vaccinée contre le papillomavirus (HPV) ?",
 ]
 
 
-def page_octobre_rose():
-    top("Octobre Rose")
+def info_card(title: str, body: str, note: str = "") -> str:
+    return (f"<div class='eb-card' style='height:100%'><h3>{title}</h3>{body}"
+            + (f"<p style='color:var(--muted);font-size:.85rem;margin:.7rem 0 0'>{note}</p>" if note else "") + "</div>")
+
+
+def ul(items: list[str]) -> str:
+    return "<ul style='margin:0;padding-left:1.1rem;line-height:1.75'>" + "".join(f"<li>{i}</li>" for i in items) + "</ul>"
+
+
+def page_infos():
+    top("Informations santé")
     a, b = st.columns([1.3, 1], gap="large", vertical_alignment="center")
     with a:
-        ui.header("Octobre Rose · grand public", "S'informer, se faire examiner tôt",
-                  "Détecté tôt, le cancer du sein se soigne beaucoup mieux. Quelques repères simples et sourcés.")
+        ui.header("Octobre Rose · santé des femmes", "S'informer, se faire examiner tôt",
+                  "Le cancer du sein et le cancer du col de l'utérus se soignent beaucoup mieux quand ils sont découverts tôt. "
+                  "Quelques repères simples, tirés des fiches de l'OMS.")
     with b:
         if (STATIC / "illustration.png").exists():
             st.image(str(STATIC / "illustration.png"), use_container_width=True)
-    t1, t2, t3 = st.tabs(["Comprendre", "Ressources locales", "Préparer ma consultation"])
+    t1, t2, t3, t4 = st.tabs(["Cancer du sein", "Cancer du col de l'utérus", "Ressources locales", "Préparer ma consultation"])
     with t1:
         c1, c2 = st.columns(2, gap="large")
-        c1.markdown("""<div class='eb-card'><h3>Les signes qui doivent amener à consulter</h3><ul style='margin:0;padding-left:1.1rem;line-height:1.75'>
-<li>une boule ou un épaississement dans le sein ou sous le bras ;</li><li>un changement de taille ou de forme du sein ;</li>
-<li>une peau qui se rétracte, rougit ou prend l'aspect d'une peau d'orange ;</li><li>un écoulement anormal ou un mamelon qui se rétracte.</li></ul>
-<p style='color:var(--muted);font-size:.85rem;margin:.7rem 0 0'>Source : OMS. La plupart des boules ne sont pas des cancers, mais toute anomalie mérite un avis médical.</p></div>""",
-                    unsafe_allow_html=True)
-        c2.markdown("""<div class='eb-card'><h3>Le parcours de soins</h3><ol style='margin:0;padding-left:1.1rem;line-height:1.85'>
-<li>Examen clinique</li><li><b style='color:#8E1D4A'>Imagerie : échographie, mammographie</b></li><li>Prélèvement si l'image est suspecte</li>
-<li>Analyse en laboratoire</li><li>Décision de traitement</li></ol>
-<p style='color:var(--muted);font-size:.85rem;margin:.7rem 0 0'>Chiffres clés : à compléter avec des données vérifiées (OMS, ministère de la Santé), source et année.</p></div>""",
-                    unsafe_allow_html=True)
+        c1.markdown(info_card("Les signes qui doivent amener à consulter", ul([
+            "une boule ou un épaississement dans le sein ou sous le bras ;",
+            "un changement de taille ou de forme du sein ;",
+            "une peau qui se rétracte, rougit ou prend l'aspect d'une peau d'orange ;",
+            "un écoulement anormal ou un mamelon qui se rétracte."]),
+            "Source : OMS. La plupart des boules ne sont pas des cancers, mais toute anomalie mérite un avis médical."),
+            unsafe_allow_html=True)
+        c2.markdown(info_card("Le parcours de soins", "<ol style='margin:0;padding-left:1.1rem;line-height:1.85'>"
+            "<li>Examen clinique</li><li><b style='color:#8E1D4A'>Imagerie : échographie, mammographie</b></li>"
+            "<li>Prélèvement si l'image est suspecte</li><li>Analyse en laboratoire</li><li>Décision de traitement</li></ol>",
+            "EchoBreast intervient à l'étape de l'imagerie, pour aider à décider quels examens relire en premier."),
+            unsafe_allow_html=True)
     with t2:
+        c1, c2 = st.columns(2, gap="large")
+        c1.markdown(info_card("Comprendre", ul([
+            "Il est causé dans la grande majorité des cas par une infection persistante à <b>papillomavirus humain (HPV)</b>, "
+            "un virus très courant qui se transmet lors des rapports sexuels.",
+            "La plupart des infections disparaissent seules. Quand elles persistent, des lésions peuvent apparaître puis, "
+            "<b>lentement</b>, évoluer vers un cancer : souvent 15 à 20 ans, moins chez les femmes dont l'immunité est affaiblie (VIH par exemple).",
+            "Ce délai laisse le temps de <b>repérer et traiter les lésions avant qu'elles deviennent un cancer</b>."]),
+            "Source : OMS, fiche « Cancer du col de l'utérus »."), unsafe_allow_html=True)
+        c2.markdown(info_card("Se protéger", ul([
+            "<b>La vaccination contre le HPV</b>, recommandée par l'OMS pour les filles de 9 à 14 ans, avant le début de la vie sexuelle.",
+            "<b>Le dépistage</b> régulier à partir de 30 ans (dès 25 ans pour les femmes vivant avec le VIH) : test HPV ou "
+            "inspection visuelle à l'acide acétique (IVA), un examen simple et peu coûteux.",
+            "<b>Le traitement des lésions</b> découvertes au dépistage, souvent possible le jour même."]),
+            "Calendrier exact et lieux de dépistage : à vérifier auprès des services de santé locaux."), unsafe_allow_html=True)
+        st.write("")
+        c3, c4 = st.columns(2, gap="large")
+        c3.markdown(info_card("Les signes qui doivent amener à consulter", ul([
+            "des saignements entre les règles, après un rapport sexuel ou après la ménopause ;",
+            "des pertes inhabituelles, parfois malodorantes ;",
+            "des douleurs dans le bas du ventre ou pendant les rapports."]),
+            "Au début, il n'y a souvent <b>aucun symptôme</b> : c'est pour cela que le dépistage est important même quand tout va bien."),
+            unsafe_allow_html=True)
+        c4.markdown(info_card("Et EchoBreast ?", "<p style='margin:0;line-height:1.6'>EchoBreast analyse uniquement des "
+            "<b>échographies du sein</b>. La même démarche (trier les examens, montrer les zones à regarder, annoncer honnêtement ses limites) "
+            "pourrait plus tard aider au dépistage du col de l'utérus, par exemple à partir de photos d'IVA. "
+            "Cela demanderait des données dédiées, collectées dans un cadre éthique, et une validation par des soignants.</p>",
+            "Piste de travail, pas une fonction disponible aujourd'hui."), unsafe_allow_html=True)
+        st.caption("L'OMS vise l'élimination de ce cancer avec trois objectifs pour 2030 : 90 % des filles vaccinées avant 15 ans, "
+                   "70 % des femmes dépistées avec un test performant à 35 et 45 ans, 90 % des femmes atteintes correctement traitées.")
+    with t3:
         st.caption("Aucune coordonnée n'est affichée avant vérification.")
         res_file = APP_DIR / "ressources.json"
         res = json.loads(res_file.read_text(encoding="utf-8")) if res_file.exists() else []
@@ -488,7 +574,7 @@ def page_octobre_rose():
             cols[i % 2].markdown(f"<div class='eb-card'><h3>{html.escape(r['nom'])}</h3><div style='color:var(--muted);margin-bottom:.6rem'>"
                                  f"{html.escape(r.get('ville', ''))}</div>{tag}{'<p>' + html.escape(r.get('contact', '')) + '</p>' if ok else ''}</div>",
                                  unsafe_allow_html=True)
-    with t3:
+    with t4:
         st.write("Cochez les questions à poser, puis téléchargez votre liste.")
         chosen = [q for q in QUESTIONS if st.checkbox(q)]
         extra = st.text_area("Mes questions personnelles")
@@ -498,13 +584,13 @@ def page_octobre_rose():
 
 
 # --------------------------------------------------------------------------
-# Navigation : 3 liens principaux, Octobre Rose dans l'encart du bas
+# Navigation : 3 liens principaux, informations santé dans l'encart du bas
 # --------------------------------------------------------------------------
 PAGES = {
     "analyse": st.Page(page_analyse, title="Analyser", icon=":material/center_focus_strong:", default=True),
     "file": st.Page(page_priorite, title="File de priorité", icon=":material/format_list_numbered:", url_path="priorites"),
     "limites": st.Page(page_limites, title="Fiabilité & limites", icon=":material/verified_user:", url_path="fiabilite"),
-    "rose": st.Page(page_octobre_rose, title="Octobre Rose", icon=":material/volunteer_activism:", url_path="octobre-rose"),
+    "rose": st.Page(page_infos, title="Informations santé", icon=":material/volunteer_activism:", url_path="informations"),
 }
 
 ui.inject_css()
@@ -515,6 +601,6 @@ with st.sidebar:
         st.page_link(PAGES[k], use_container_width=True)
     st.markdown(f"<div class='eb-foot'>{ui.icon('lock', 14)} Traitement local · aucune image conservée</div>",
                 unsafe_allow_html=True)
-    st.page_link(PAGES["rose"], label="Octobre Rose · Informations", icon=":material/volunteer_activism:",
+    st.page_link(PAGES["rose"], label="Informations santé", icon=":material/volunteer_activism:",
                  use_container_width=True)
 nav.run()

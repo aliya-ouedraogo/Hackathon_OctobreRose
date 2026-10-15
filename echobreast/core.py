@@ -98,7 +98,7 @@ class Settings:
     """Réglages fixés sur le jeu de VALIDATION par scripts/evaluate.py."""
 
     temperature: float = 1.0
-    t_orange: float = 0.10   # p(maligne) au-delà de laquelle on relit (sensibilité ≥ 95 %)
+    t_orange: float = 0.10   # seuil de vigilance : p(maligne) au-delà de laquelle on relit (sensibilité ≥ 95 %)
     t_red: float = 0.50      # p(maligne) au-delà de laquelle c'est prioritaire
     min_confidence: float = 0.35
     cls_arch: str = "efficientnet_b0"
@@ -124,16 +124,25 @@ APP_TAGLINE = "Aide à la priorisation des échographies mammaires"
 
 # Couleur = toujours doublée d'une icône et d'un libellé (accessibilité).
 LEVELS = {
-    "rouge": {"rank": 0, "icon": "octagon-alert", "label": "Prioritaire", "color": "#C8264E",
+    "rouge": {"rank": 0, "icon": "octagon-alert", "label": "Prioritaire", "zone": "Zone suspecte", "color": "#C8264E",
               "soft": "#FCE7EC", "short": "Prioritaire",
-              "text": "Probabilité élevée de malignité selon le modèle : à traiter en priorité."},
-    "orange": {"rank": 1, "icon": "triangle-alert", "label": "À relire", "color": "#D9822B",
+              "text": "Le modèle trouve cette image très évocatrice d'un cancer : à relire en premier."},
+    "orange": {"rank": 1, "icon": "triangle-alert", "label": "À relire", "zone": "Zone à vérifier", "color": "#D9822B",
                "soft": "#FCEFDF", "short": "À relire",
-               "text": "Zone d'incertitude : relecture prioritaire recommandée."},
-    "vert": {"rank": 2, "icon": "circle-check", "label": "Risque faible", "color": "#2F8F62",
+               "text": "Résultat incertain ou à surveiller : à relire rapidement."},
+    "vert": {"rank": 2, "icon": "circle-check", "label": "Risque faible", "zone": "Lésion d'aspect bénin", "color": "#2F8F62",
              "soft": "#E2F3EA", "short": "Risque faible",
-             "text": "Risque faible selon le modèle — ce n'est pas une absence de maladie."},
+             "text": "Peu de signes inquiétants pour le modèle. Cela ne prouve pas l'absence de maladie."},
 }
+
+
+def fmt_pct(p: float) -> str:
+    """Pourcentage lisible : « moins de 1 % » plutôt qu'un « 0 % » trompeur."""
+    if p < 0.005:
+        return "moins de 1 %"
+    if p > 0.995:
+        return "plus de 99 %"
+    return f"{p:.0%}".replace("%", " %")
 
 
 def risk_level(probs: np.ndarray, s: Settings) -> tuple[str, list[str]]:
@@ -142,14 +151,20 @@ def risk_level(probs: np.ndarray, s: Settings) -> tuple[str, list[str]]:
     p_mal = float(probs[MALIGNE])
     conf = confidence(probs)
     if p_mal >= s.t_red:
-        return "rouge", [f"p(maligne) = {p_mal:.0%} ≥ seuil rouge {s.t_red:.0%}"]
+        return "rouge", [f"Le modèle estime à {fmt_pct(p_mal)} la probabilité d'une lésion maligne. "
+                         f"C'est au-dessus de {s.t_red:.0%}, le niveau à partir duquel l'examen passe en priorité."]
     if p_mal >= s.t_orange:
-        reasons.append(f"p(maligne) = {p_mal:.0%} ≥ seuil de prudence {s.t_orange:.0%}")
+        reasons.append(f"Le modèle estime à {fmt_pct(p_mal)} la probabilité d'une lésion maligne. C'est au-dessus de "
+                       f"{s.t_orange:.0%}, le seuil de vigilance choisi pour ne laisser passer presque aucun cancer.")
     if conf < s.min_confidence:
-        reasons.append("Résultat peu fiable (confiance faible), relecture prioritaire")
+        reasons.append("Le modèle hésite entre plusieurs réponses : son résultat est peu sûr, "
+                       "une relecture est conseillée.")
     if reasons:
         return "orange", reasons
-    return "vert", [f"p(maligne) = {p_mal:.0%} < seuil de prudence {s.t_orange:.0%}"]
+    return "vert", [f"Le modèle estime à {fmt_pct(p_mal)} la probabilité d'une lésion maligne, "
+                    f"en dessous du seuil de vigilance ({s.t_orange:.0%})."
+                    + (" La lésion repérée a plutôt l'aspect d'une lésion bénigne (non cancéreuse) pour le modèle."
+                       if int(probs.argmax()) == 1 else "")]
 
 
 def priority_key(level: str, probs: np.ndarray) -> tuple:

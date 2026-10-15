@@ -62,7 +62,7 @@ def build_pdf(annotated: Image.Image, result, model_version: str, case_name: str
     pdf.ln(3)
     pdf.set_font("Helvetica", "B", 11)
     pdf.set_x(x0)
-    pdf.cell(83, 7, _latin1("Probabilités (calibrées)"), new_x="LEFT", new_y="NEXT")
+    pdf.cell(83, 7, _latin1("Ce que le modèle voit dans l'image"), new_x="LEFT", new_y="NEXT")
     pdf.set_font("Helvetica", "", 10)
     for name, p in zip(CLASSES, result.probs):
         pdf.set_x(x0)
@@ -77,13 +77,13 @@ def build_pdf(annotated: Image.Image, result, model_version: str, case_name: str
         pdf.set_x(x0)
     pdf.ln(2)
     pdf.set_x(x0)
-    pdf.cell(83, 6, _latin1(f"Confiance du modèle : {result.confidence:.0%}"), new_x="LEFT", new_y="NEXT")
+    pdf.cell(83, 6, _latin1(f"Certitude du modèle : {result.confidence * 100:.0f}/100"), new_x="LEFT", new_y="NEXT")
     pdf.set_font("Helvetica", "I", 9)
     for reason in result.reasons + result.warnings:
         pdf.set_x(x0)
         pdf.multi_cell(83, 4.5, _latin1("- " + reason), align="L", new_x="LEFT", new_y="NEXT")
     pdf.set_x(x0)
-    pdf.multi_cell(83, 4.5, _latin1("Contour : " + ("affiché, couleur du niveau" if result.mask is not None
+    pdf.multi_cell(83, 4.5, _latin1("Contour : " + ("lésion repérée, tracée dans la couleur du niveau" if result.mask is not None
                                                     else "aucun contour affiché")), new_x="LEFT", new_y="NEXT")
 
     pdf.set_xy(12, max(pdf.get_y(), 140) + 6)
@@ -121,7 +121,7 @@ def build_queue_pdf(rows: list[dict], model_version: str) -> bytes:
     widths = [14, 70, 36, 30, 22, 14]
     pdf.set_font("Helvetica", "B", 10)
     pdf.set_fill_color(244, 234, 245)
-    for w, h in zip(widths, ["Rang", "Examen", "Niveau", "p(maligne)", "Confiance", "Relu"]):
+    for w, h in zip(widths, ["Rang", "Examen", "Niveau", "Risque estimé", "Certitude", "Relu"]):
         pdf.cell(w, 8, _latin1(h), border=0, fill=True)
     pdf.ln(8)
     pdf.set_font("Helvetica", "", 10)
@@ -134,7 +134,7 @@ def build_queue_pdf(rows: list[dict], model_version: str) -> bytes:
         pdf.cell(widths[2], 8, _latin1(lv["label"]))
         pdf.set_text_color(40, 40, 40)
         pdf.cell(widths[3], 8, f"{r['p']:.0%}")
-        pdf.cell(widths[4], 8, f"{r['conf']:.2f}")
+        pdf.cell(widths[4], 8, f"{r['conf'] * 100:.0f}/100")
         pdf.cell(widths[5], 8, "oui" if r.get("relu") else "-", new_x="LMARGIN", new_y="NEXT")
         pdf.set_draw_color(239, 225, 234)
         pdf.line(12, pdf.get_y(), 198, pdf.get_y())

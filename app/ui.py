@@ -105,12 +105,20 @@ div[data-baseweb="select"]>div, [data-testid="stTextInput"] input{ border-radius
 .eb-badge{ --c:#999; display:inline-flex; align-items:center; gap:.45rem; padding:.28rem .75rem .28rem .6rem; border-radius:999px;
   font-weight:600; font-size:.88rem; color:var(--c); background:var(--soft); white-space:nowrap;
   box-shadow:0 0 0 1px color-mix(in srgb,var(--c) 22%,transparent), 0 6px 18px -8px color-mix(in srgb,var(--c) 70%,transparent); }
-.eb-badge .dot{ position:relative; width:8px; height:8px; border-radius:50%; background:var(--c); box-shadow:0 0 8px 1px var(--c); }
-.eb-badge .dot::after{ content:""; position:absolute; inset:-4px; border-radius:50%; border:1.5px solid var(--c); opacity:.6; animation:eb-pulse 2.2s ease-out infinite; }
+.eb-badge .dot{ width:8px; height:8px; border-radius:50%; background:var(--c); }
 .eb-badge svg{ margin-left:-.1rem; }
 .eb-badge.sm{ font-size:.8rem; padding:.2rem .6rem .2rem .5rem; }
-@keyframes eb-pulse{ 0%{ transform:scale(.7); opacity:.7 } 80%,100%{ transform:scale(1.9); opacity:0 } }
-@media (prefers-reduced-motion: reduce){ .eb-badge .dot::after{ animation:none } }
+
+/* Légende et guide */
+.eb-legend{ background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:.8rem 1rem; box-shadow:var(--shadow); }
+.eb-leg{ display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:.5rem 1.2rem; }
+.eb-leg2{ margin-top:.6rem; padding-top:.6rem; border-top:1px dashed var(--line); }
+.eb-leg-i{ display:flex; gap:.6rem; align-items:center; font-size:.88rem; color:var(--ink); }
+.eb-leg-i{ align-items:flex-start; } .eb-leg-i .eb-badge{ flex:none; min-width:7.2rem; } .eb-leg-i svg{ margin-top:5px; }
+.eb-leg-i svg{ flex:none; width:34px; }
+.eb-guide{ display:flex; gap:.6rem; align-items:flex-start; background:#FAF5FA; border-radius:12px; padding:.7rem .8rem; margin-top:.8rem;
+  font-size:.86rem; color:#4A3F4C; line-height:1.5; }
+.eb-guide svg{ flex:none; margin-top:2px; } .eb-guide b{ display:block; color:var(--ink); margin-bottom:.15rem; }
 
 /* Carte de triage */
 .eb-big{ font-family:var(--serif); font-size:3.3rem; line-height:1; color:var(--ink); }
@@ -196,7 +204,7 @@ def topbar(page: str, version: str, synthetic: bool):
     tag = ("<span class='eb-tag warn'>Modèle de test · synthétique</span>" if synthetic
            else f"<span class='eb-tag'>Modèle {html.escape(version)}</span>")
     st.markdown(f"<div class='eb-top'><div class='eb-crumb'>{APP_NAME} / <b>{page}</b></div><div class='eb-top-r'>"
-                f"<span class='eb-pill-info'>{icon('info', 15)} Aide à la lecture — pas un diagnostic</span>{tag}</div></div>",
+                f"<span class='eb-pill-info'>{icon('info', 15)} Aide à la lecture, pas un diagnostic</span>{tag}</div></div>",
                 unsafe_allow_html=True)
 
 
@@ -211,6 +219,31 @@ def badge(level: str, size: str = "") -> str:
             f"<span class='dot'></span>{lv['label']}</span>")
 
 
+def pct(p: float, sep: str = " ") -> str:
+    """Pourcentage court : « <1 % » et « >99 % » plutôt que 0 % ou 100 %."""
+    if p < 0.005:
+        return f"&lt;1{sep}%"
+    if p > 0.995:
+        return f"&gt;99{sep}%"
+    return f"{p * 100:.0f}{sep}%"
+
+
+def legend():
+    """Légende permanente : signification des couleurs et des contours."""
+    items = "".join(
+        f"<div class='eb-leg-i'>{badge(k, 'sm')}<span>{t}</span></div>"
+        for k, t in (("rouge", "très évocateur d'un cancer : à relire en premier"),
+                     ("orange", "incertain ou à surveiller : à relire rapidement"),
+                     ("vert", "peu de signes inquiétants, ce n'est pas un « normal » garanti")))
+    lines = ("<div class='eb-leg-i'><svg width='34' height='12'><path d='M2 6h30' stroke='#8E1D4A' stroke-width='3' "
+             "stroke-linecap='round'/></svg><span><b>Trait plein</b> : contour de la lésion repérée</span></div>"
+             "<div class='eb-leg-i'><svg width='34' height='12'><path d='M2 6h30' stroke='#F472B6' stroke-width='2.5' "
+             "stroke-dasharray='6 4' stroke-linecap='round'/></svg><span><b>Pointillés</b> : endroit où l'IA a regardé, "
+             "à vérifier</span></div>")
+    st.markdown(f"<div class='eb-legend'><div class='eb-label' style='margin-bottom:.45rem'>Légende</div>"
+                f"<div class='eb-leg'>{items}</div><div class='eb-leg eb-leg2'>{lines}</div></div>", unsafe_allow_html=True)
+
+
 def confidence_level(conf: float, min_conf: float) -> tuple[str, str]:
     if conf < min_conf:
         return "Faible", "faible"
@@ -220,45 +253,59 @@ def confidence_level(conf: float, min_conf: float) -> tuple[str, str]:
 def triage_card(res, settings):
     lv = LEVELS[res.level]
     p = res.p_malignant
-    marks = [(settings.t_orange, "Seuil de prudence"), (settings.t_red, "Seuil prioritaire")]
-    mk = "".join(f"<div class='mk' style='left:{min(99.5, t * 100):.1f}%'><span>{t:.0%}</span></div>" for t, _ in marks)
-    headline = {"rouge": "Relecture prioritaire recommandée", "orange": "Relecture recommandée",
-                "vert": "Risque faible selon le modèle"}[res.level]
+    mk = "".join(f"<div class='mk' style='left:{min(99.5, t * 100):.1f}%'><span>{t:.0%}</span></div>"
+                 for t in (settings.t_orange, settings.t_red))
+    headline = {"rouge": "À relire en premier", "orange": "À relire rapidement",
+                "vert": "Peu de signes inquiétants"}[res.level]
     crit = []
     for r in res.reasons:
-        ic = ("shield-alert", "#D9822B") if "confiance" in r.lower() else ("triangle-alert", lv["color"])
+        ic = ("shield-alert", "#D9822B") if "hésite" in r else ("triangle-alert", lv["color"])
         crit.append(f"<div class='eb-crit'>{icon(ic[0], 17, ic[1])}<span>{html.escape(r)}</span></div>")
     st.markdown(f"""<div class='eb-card'>
-<div class='eb-row'><span class='eb-label'>Triage automatisé</span>{badge(res.level)}</div>
-<div style='margin-top:.7rem' class='eb-big'>{p * 100:.0f}&thinsp;%<small>probabilité de malignité</small></div>
-<div class='eb-thr' aria-label='Probabilité {p:.0%}, seuil de prudence {settings.t_orange:.0%}'>
+<div class='eb-row'><span class='eb-label'>Résultat de l'IA</span>{badge(res.level)}</div>
+<div style='margin-top:.7rem' class='eb-big'>{pct(p, '&thinsp;')}<small>risque estimé de cancer</small></div>
+<div class='eb-thr' aria-label='Risque estimé {p:.0%}, seuil de vigilance {settings.t_orange:.0%}, seuil prioritaire {settings.t_red:.0%}'>
 <div class='fill' style='width:{p * 100:.1f}%'></div>{mk}</div>
 <div class='eb-scale'><span>0 %</span><span>100 %</span></div>
-<div style='font-size:.8rem;color:var(--muted);margin-top:.25rem'>Repères : seuil de prudence <b class='eb-mono' style='color:var(--wine)'>{settings.t_orange:.0%}</b> · seuil prioritaire <b class='eb-mono' style='color:var(--wine)'>{settings.t_red:.0%}</b></div>
+<div style='font-size:.84rem;color:var(--muted);margin-top:.3rem;line-height:1.5'>Au-delà de <b style='color:var(--wine)'>{settings.t_orange:.0%}</b> (seuil de vigilance) l'examen passe en orange,
+au-delà de <b style='color:var(--wine)'>{settings.t_red:.0%}</b> (seuil prioritaire) en rouge.</div>
 <div class='eb-alert' style='--c:{lv['color']};--soft:{lv['soft']}'>{icon(lv['icon'], 18, lv['color'])}{headline}</div>
-<div class='eb-label' style='margin-top:1.1rem'>Critères déterminants</div>{''.join(crit)}
+<div class='eb-label' style='margin-top:1.1rem'>Pourquoi cette couleur ?</div>{''.join(crit)}
 </div>""", unsafe_allow_html=True)
+
+
+CLASS_HELP = {"normale": "aucune lésion visible", "bénigne": "lésion non cancéreuse", "maligne": "lésion évocatrice de cancer"}
 
 
 def probs_card(res, settings):
     rows = "".join(
-        f"<div class='eb-prob'><div class='eb-row'><span style='color:{CLASS_COLORS[c] if c == 'maligne' else INK}'>{c.capitalize()}</span>"
-        f"<b>{p * 100:.0f} %</b></div><div class='eb-track'><div style='width:{p * 100:.1f}%;background:{CLASS_COLORS[c]}'></div></div></div>"
+        f"<div class='eb-prob'><div class='eb-row'><span><span style='color:{CLASS_COLORS[c] if c == 'maligne' else INK}'>{c.capitalize()}</span>"
+        f" <span style='color:var(--muted);font-size:.82rem'>· {CLASS_HELP[c]}</span></span>"
+        f"<b>{pct(p)}</b></div><div class='eb-track'><div style='width:{p * 100:.1f}%;background:{CLASS_COLORS[c]}'></div></div></div>"
         for c, p in zip(CLASSES, res.probs))
     label, key = confidence_level(res.confidence, settings.min_confidence)
     colors = {"faible": "#D9822B", "moyenne": "#8C6BB1", "elevee": "#2F8F62"}
     seg = "".join(f"<span class='{'on' if k == key else ''}' style='--c:{colors[k]}'>{n}</span>"
                   for n, k in (("Faible", "faible"), ("Moyenne", "moyenne"), ("Élevée", "elevee")))
-    note = ("Résultat peu fiable : la règle de prudence bascule en orange." if key == "faible"
-            else "Indice = 1 − entropie normalisée des probabilités.")
+    note = {"faible": "Le modèle hésite entre plusieurs réponses. Par prudence, l'examen passe en orange.",
+            "moyenne": "Une réponse se dégage, sans être nette.",
+            "elevee": "Une réponse se détache nettement des deux autres."}[key]
     st.markdown(f"""<div class='eb-card'>
-<div class='eb-row'><span class='eb-label'>Probabilités calibrées</span><span class='eb-mono' style='color:var(--muted);font-size:.8rem'>Σ = 100 %</span></div>{rows}
-<div class='eb-row' style='margin-top:1rem'><b style='font-weight:600'>Niveau de confiance</b>
-<span class='eb-mono' style='color:var(--wine);font-size:.85rem'>Indice : {res.confidence:.2f}</span></div>
-<div class='eb-seg'>{seg}</div><div style='color:var(--muted);font-size:.84rem'>{note}</div></div>""", unsafe_allow_html=True)
+<div class='eb-label'>Ce que le modèle voit dans l'image</div>{rows}
+<div class='eb-guide'>{icon('info', 16, ui_wine())}<div><b>Comment lire ces pourcentages ?</b>
+Les trois chiffres se partagent 100 %. Ils disent à quoi l'image ressemble le plus pour le modèle.
+Par exemple, « maligne 30 % » veut dire que, lors des tests, sur 100 images ayant ce score,
+environ 30 étaient réellement des cancers. C'est une estimation, pas une certitude.</div></div>
+<div class='eb-row' style='margin-top:1rem'><b style='font-weight:600'>Le modèle est-il sûr de lui ?</b>
+<span class='eb-mono' style='color:var(--wine);font-size:.85rem'>{res.confidence * 100:.0f}/100</span></div>
+<div class='eb-seg'>{seg}</div><div style='color:var(--muted);font-size:.86rem'>{note}</div></div>""", unsafe_allow_html=True)
+
+
+def ui_wine() -> str:
+    return WINE
 
 
 def stat(label: str, value: str, ci: list | None, desc: str, tag: str = "") -> str:
-    ci_txt = f"IC 95 % : {ci[0] * 100:.1f} – {ci[1] * 100:.1f} %" if ci else "&nbsp;"
+    ci_txt = f"Fourchette probable : {ci[0] * 100:.0f} à {ci[1] * 100:.0f} %" if ci else "&nbsp;"
     return (f"<div class='eb-stat'><div class='eb-row'><span style='font-size:.88rem'>{label}</span>{tag}</div>"
             f"<div class='v'>{value}</div><div class='ci'>{ci_txt}</div><p>{desc}</p></div>")

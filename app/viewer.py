@@ -123,7 +123,7 @@ html,body{margin:0;height:100%;font-family:'Inter',system-ui,sans-serif;color:va
     </div>
     <div class="tb" role="group" aria-label="Calques">
       <button class="b" id="tContour" aria-pressed="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg><span class="tx">Contour</span></button>
-      <button class="b" id="tAtt" aria-pressed="false"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg><span class="tx">Attention du modèle</span></button>
+      <button class="b" id="tAtt" aria-pressed="false"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg><span class="tx">Où l'IA a regardé</span></button>
       <button class="b" id="tSharp" aria-pressed="false" title="Amélioration visuelle uniquement"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4M19 14v4M10 2v2M7 8H3M21 16h-4M11 3H9"/></svg><span class="tx">Netteté</span></button>
       <button class="b" id="tCmp" aria-pressed="false"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18"/></svg><span class="tx">Comparer</span></button>
     </div>
@@ -141,12 +141,12 @@ html,body{margin:0;height:100%;font-family:'Inter',system-ui,sans-serif;color:va
  </div>
 </div>
 <script>
-const W=__W__, H=__H__, ZONES=__ZONES__, LVL='__LEVEL__', SHARP='__SHARP__', HEAT='__HEAT__';
+const W=__W__, H=__H__, ZONES=__ZONES__, LVL='__LEVEL__', SHARP='__SHARP__', HEAT='__HEAT__', LES=__LES__, LVK='__LVK__';
 const $=id=>document.getElementById(id), stage=$('stage'), view=$('view'), NS='http://www.w3.org/2000/svg';
 let fit=1, s=1, tx=0, ty=0, cur=-1, split=.5, loupeOn=true, hover=null;
 const imgBase=$('imgBase'), imgSharp=$('imgSharp');
 const zoneColor=z=>z.kind==='lesion'?LVL:'#F472B6';
-const zoneName=(z,i)=>z.kind==='lesion'?`Zone suspecte ${i+1}`:`Zone d'attention ${i+1}`;
+const zoneName=(z,i)=>z.kind==='lesion'?`${LES} ${i+1}`:`Regard de l'IA ${i+1}`;
 const pressed=id=>$(id).getAttribute('aria-pressed')==='true';
 function rect(){return stage.getBoundingClientRect();}
 function layout(){const th=document.querySelector('.tools').offsetHeight+20; $('mini').style.top=th+'px'; $('lblL').style.top=th+'px'; $('lblR').style.top=th+'px'; const r=rect(); fit=Math.min(r.width/W,r.height/H); view.style.width=(W*fit)+'px'; view.style.height=(H*fit)+'px';}
@@ -179,8 +179,8 @@ function caption(){
   if(cur<0){c.innerHTML='Cliquez une zone, une étiquette sur l’image, ou utilisez ‹ › pour zoomer dessus.';return;}
   const z=ZONES[cur];
   c.innerHTML=z.kind==='lesion'
-   ?`<b>Zone ${cur+1} · contour détecté</b> — ${z.area_pct.toFixed(1)} % de l'image. Taille réelle non mesurable (échelle inconnue).`
-   :`<b>Zone ${cur+1} · attention du modèle</b> — hors contour : région qui a pesé dans la décision, à vérifier visuellement. Ce n'est pas une lésion confirmée.`;
+   ?`<b>Zone ${cur+1} : ${LVK==='vert'?'lésion repérée, d\'aspect plutôt bénin pour l\'IA':LVK==='rouge'?'lésion repérée, jugée suspecte par l\'IA':'lésion repérée, à vérifier'}.</b> Elle occupe ${z.area_pct.toFixed(1).replace('.',',')} % de l'image. Sa taille réelle en mm ne peut pas être mesurée.`
+   :`<b>Zone ${cur+1} : endroit où l'IA a beaucoup regardé</b>, en dehors de la lésion repérée. Cela sert à vérifier son raisonnement : si l'IA regarde un bord de l'image, un texte ou une ombre plutôt qu'une lésion, méfiez-vous du résultat. Ce n'est pas une lésion confirmée.`;
 }
 function renderChips(){
   const box=$('chips'); box.innerHTML='';
@@ -202,7 +202,7 @@ function drawZones(){
       Object.entries(a).forEach(([k,v])=>e.setAttribute(k,v)); e.style.strokeWidth=(z.kind==='lesion'?2.4:2)+'px'; grp.appendChild(e);});
     g.appendChild(grp);
     const t=document.createElement('div'); t.className='tag'+(z.kind==='lesion'?'':' att'); t.dataset.i=i; t.dataset.kind=z.kind;
-    t.style.setProperty('--c',col); t.innerHTML=`<span class="n">${i+1}</span>${z.kind==='lesion'?'Zone suspecte':'Attention'}`;
+    t.style.setProperty('--c',col); t.innerHTML=`<span class="n">${i+1}</span>${z.kind==='lesion'?LES:'Regard de l\'IA'}`;
     t.onclick=()=>focusZone(i); tags.appendChild(t);
   });
 }
@@ -230,7 +230,7 @@ function drawLoupe(){
 /* boutons */
 function tog(id){const on=!pressed(id); $(id).setAttribute('aria-pressed',on); return on;}
 function note(){const vis=pressed('tSharp')||pressed('tCmp'); $('note').classList.toggle('vis',vis);
-  $('noteT').textContent=vis?'Amélioration visuelle uniquement — l’analyse utilise l’image originale':'Vue originale';}
+  $('noteT').textContent=vis?'Amélioration visuelle uniquement : l’analyse utilise l’image originale':'Vue originale';}
 $('tContour').onclick=()=>{setVisible('lesion',tog('tContour')); drawLoupe();};
 $('tAtt').onclick=()=>{const on=tog('tAtt'); const im=$('imgHeat'); if(on&&!im.src) im.src=HEAT; im.classList.toggle('hidden',!on); setVisible('attention',on); drawLoupe();};
 $('tSharp').onclick=()=>{const on=tog('tSharp'); if(on&&!imgSharp.src){imgSharp.src=SHARP; imgSharp.onload=drawLoupe;} imgSharp.classList.toggle('hidden',!on||pressed('tCmp')); note(); drawLoupe();};
@@ -274,13 +274,18 @@ drawZones(); setVisible('attention',false); layout(); s=1; apply(false); renderC
 
 
 def render_viewer(base: Image.Image, sharp: Image.Image, heat: Image.Image | None, zones: list[dict],
-                  natural_size: tuple[int, int], level_color: str, height: int = 720):
+                  natural_size: tuple[int, int], level: str, height: int = 720):
+    from echobreast.core import LEVELS
+
+    level_color, lesion_label = LEVELS[level]["color"], LEVELS[level]["zone"]
     w, h = natural_size
     page = (TEMPLATE.replace("__BASE__", data_uri(base, "JPEG"))
             .replace("__SHARP__", data_uri(sharp, "JPEG"))
             .replace("__HEAT__", data_uri(heat) if heat is not None else "")
             .replace("__ZONES__", json.dumps(zones))
             .replace("__LEVEL__", level_color)
+            .replace("__LES__", json.dumps(lesion_label))
+            .replace("__LVK__", level)
             .replace("__BLUR__", f"{max(w, h) / 160:.1f}")
             .replace("__W__", str(w)).replace("__H__", str(h)))
     components.html(page, height=height)
