@@ -23,7 +23,9 @@ def _latin1(text: str) -> str:
 
 
 def build_pdf(annotated: Image.Image, result, model_version: str, case_name: str = "examen",
-              annotations: list[dict] | None = None) -> bytes:
+              annotations: list[dict] | None = None, decision: dict | None = None) -> bytes:
+    """decision : {"relu", "complement", "prelevement": bool, "comment": str}, rempli dans l'application.
+    Les cases non cochées et un commentaire vide restent à compléter à la main."""
     lv = LEVELS[result.level]
     pdf = FPDF(format="A4")
     pdf.set_auto_page_break(True, 15)
@@ -98,11 +100,20 @@ def build_pdf(annotated: Image.Image, result, model_version: str, case_name: str
 
     pdf.set_xy(12, max(pdf.get_y(), 140) + 6)
     pdf.set_font("Helvetica", "B", 11)
-    pdf.cell(0, 7, _latin1("Décision du professionnel (à compléter à la main)"), new_x="LMARGIN", new_y="NEXT")
+    d = decision or {}
+    filled = any(d.get(k) for k in ("relu", "complement", "prelevement", "comment"))
+    pdf.cell(0, 7, _latin1("Décision du professionnel " + ("(renseignée dans EchoBreast, à compléter si besoin)"
+                                                             if filled else "(à compléter à la main)")),
+             new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("Helvetica", "", 10)
-    for line in ["[ ] Relecture effectuée", "[ ] Examen complémentaire demandé",
-                 "[ ] Prélèvement indiqué", "Commentaire : ...................................................."]:
-        pdf.cell(0, 7, _latin1(line), new_x="LMARGIN", new_y="NEXT")
+    for k, label in (("relu", "Relecture effectuée"), ("complement", "Examen complémentaire demandé"),
+                     ("prelevement", "Prélèvement indiqué")):
+        pdf.cell(0, 7, _latin1(("[X] " if d.get(k) else "[ ] ") + label), new_x="LMARGIN", new_y="NEXT")
+    comment = (d.get("comment") or "").strip()
+    if comment:
+        pdf.multi_cell(0, 6, _latin1("Commentaire : " + comment[:400]), align="L", new_x="LMARGIN", new_y="NEXT")
+    else:
+        pdf.cell(0, 7, "Commentaire : ....................................................", new_x="LMARGIN", new_y="NEXT")
 
     pdf.set_y(-38)
     pdf.set_fill_color(252, 228, 236)

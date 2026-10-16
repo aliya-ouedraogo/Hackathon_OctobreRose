@@ -154,6 +154,39 @@ Il ne pose pas de diagnostic, ne mesure pas la taille en mm et n'a pas été val
 # --------------------------------------------------------------------------
 # Page : Analyser
 # --------------------------------------------------------------------------
+DECISION_ITEMS = {"relu": "Relecture effectuée", "complement": "Examen complémentaire demandé",
+                  "prelevement": "Prélèvement indiqué"}
+
+
+def decision_card(key: str):
+    """Cases et commentaire facultatifs du professionnel, reportés tels quels dans la fiche PDF.
+    Gardés en mémoire de session seulement. « Relecture effectuée » est la même information que
+    « Marquer comme relu » dans la file de priorité."""
+    store = st.session_state.setdefault("decisions", {}).setdefault(key, {})
+    reviewed: set = st.session_state.setdefault("reviewed", set())
+    store["relu"] = key in reviewed
+
+    def save(field: str):
+        value = st.session_state[f"dec_{field}_{key}"]
+        store[field] = value
+        if field == "relu":
+            (reviewed.add if value else reviewed.discard)(key)
+
+    with st.container(border=True, key=f"decision_box_{key[:12]}"):
+        st.markdown("<div class='eb-label'>Décision du professionnel</div>"
+                    "<div style='color:var(--muted);font-size:.85rem;margin:.25rem 0 .4rem'>Facultatif. Ce que vous "
+                    "cochez ou écrivez apparaît dans la fiche PDF. Ce qui reste vide sera à compléter à la main.</div>",
+                    unsafe_allow_html=True)
+        for field, label in DECISION_ITEMS.items():
+            st.session_state[f"dec_{field}_{key}"] = bool(store.get(field, False))
+            st.checkbox(label, key=f"dec_{field}_{key}", on_change=save, args=(field,))
+        st.session_state[f"dec_comment_{key}"] = store.get("comment", "")
+        st.text_area("Commentaire", key=f"dec_comment_{key}", on_change=save, args=("comment",), max_chars=400,
+                     height=90, placeholder="Votre commentaire (facultatif)")
+    # Renvoie une fonction : la fiche PDF lit la décision au moment du clic, pas au dernier affichage.
+    return lambda: {**{f: bool(store.get(f, False)) for f in DECISION_ITEMS}, "comment": store.get("comment", "").strip()}
+
+
 def page_analyse():
     top("Analyser")
     h, ctl = st.columns([1.25, 1], vertical_alignment="bottom")
@@ -233,9 +266,13 @@ def page_analyse():
                         f"<div style='margin-top:.4rem;font-size:.92rem'>{len(anns)} zone(s) ajoutée(s) à la main, incluse(s) dans la fiche PDF.</div>"
                         f"<div style='color:var(--muted);font-size:.85rem;margin-top:.3rem'>{html.escape(items)}</div></div>",
                         unsafe_allow_html=True)
+        decision = decision_card(key)
         st.write("")
-        st.download_button("Télécharger la fiche PDF", build_pdf(draw_contour(raw, res.mask, res.level, annotations=anns, labels=True),
-                                                                  res, an.settings.model_version, name, annotations=anns),
+        version = an.settings.model_version
+        # PDF construit au clic : il reprend les cases et le commentaire tels qu'ils sont à ce moment-là.
+        st.download_button("Télécharger la fiche PDF",
+                           lambda: build_pdf(draw_contour(raw, res.mask, res.level, annotations=anns, labels=True),
+                                             res, version, name, annotations=anns, decision=decision()),
                            file_name=f"echobreast_{Path(name).stem}.pdf", mime="application/pdf", type="primary",
                            icon=":material/download:", use_container_width=True)
         if truth:

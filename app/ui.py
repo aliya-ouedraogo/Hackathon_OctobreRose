@@ -111,6 +111,7 @@ div[data-baseweb="select"]>div, [data-testid="stTextInput"] input{ border-radius
 
 /* Légende et guide */
 .st-key-legend_box{ background:#fff; box-shadow:var(--shadow); margin-bottom:.6rem; }
+[class*='st-key-decision_box']{ background:#fff; box-shadow:var(--shadow); margin-top:.8rem; }
 .st-key-guide_btn{ display:flex; justify-content:flex-end; }
 .st-key-guide_btn button{ min-height:38px; padding:.35rem 1rem; }
 .eb-legend{ background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:.8rem 1rem; box-shadow:var(--shadow); }
