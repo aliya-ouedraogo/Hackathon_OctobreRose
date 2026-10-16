@@ -118,7 +118,9 @@ sur 100 images ayant ce score, environ 30 étaient réellement des cancers. Ce n
 - **Seuil de vigilance ({settings.t_orange:.0%})** : au-dessus, l'examen passe en orange. Il est volontairement bas pour ne laisser
   passer presque aucun cancer, quitte à créer des fausses alertes.
 - **Seuil prioritaire ({settings.t_red:.0%})** : au-dessus, l'examen passe en rouge.
-- Si le modèle **hésite** entre plusieurs réponses, l'examen passe en orange par prudence, même avec un faible pourcentage.
+- Si le modèle **hésite** (par exemple « bénigne 40 % » contre « maligne 35 % »), l'examen passe en orange par prudence,
+  même avec un faible pourcentage. Causes fréquentes : image différente de celles de l'apprentissage (autre appareil,
+  mammographie…), mauvaise qualité, lésion d'aspect intermédiaire, lésion coupée par le bord de l'image.
 
 #### 4. Les tracés sur l'image
 - **Trait plein** (couleur du niveau) : contour de la lésion repérée par le modèle. Son nom suit la couleur :
@@ -131,13 +133,20 @@ sur 100 images ayant ce score, environ 30 étaient réellement des cancers. Ce n
   Si elles tombent **hors du sein** (fond noir, bord, texte, mesures incrustées), le résultat est peu crédible : l'image est
   sans doute trop différente de celles que l'IA a apprises. Ces zones ne sont pas des lésions confirmées.
 
-#### 5. Avant / après IA, et Netteté
+#### 5. Vos propres annotations
+Une zone vous semble suspecte et l'IA ne l'a pas entourée ? Cliquez sur **Annoter**, choisissez la couleur qui vous semble
+adaptée (Prioritaire, À relire, Risque faible), puis entourez la zone sur l'image. Vos tracés sont **bordés de blanc** et
+portent l'étiquette **« Soignant »** ; ceux de l'IA portent l'étiquette **« IA »**. Rien n'est gardé tant que vous n'avez pas
+cliqué sur **Enregistrer** ; « Annuler les modifications » revient à la dernière version enregistrée. Les zones enregistrées
+apparaissent dans la fiche PDF, à côté de celles de l'IA. Elles sont gardées le temps de la session, jamais envoyées ailleurs.
+
+#### 6. Avant / après IA, et Netteté
 - **Avant / après IA** : un curseur sépare l'image brute (à gauche, sans aucun tracé) et la même image avec l'analyse de l'IA
   (à droite, contours et zones). Faites-le glisser pour vérifier ce que l'IA a ajouté.
 - **Netteté** : réduit le grain de l'échographie pour mieux voir. Elle sert **uniquement à l'œil** : le modèle analyse
   toujours l'image originale.
 
-#### 6. Ce que l'outil ne fait pas
+#### 7. Ce que l'outil ne fait pas
 Il ne pose pas de diagnostic, ne mesure pas la taille en mm et n'a pas été validé sur des patientes du Burkina Faso.
 **La décision appartient toujours au professionnel de santé.**""")
 
@@ -206,18 +215,27 @@ def page_analyse():
             assets = viewer_assets(key)
         from viewer import render_viewer
 
-        render_viewer(assets["base"], assets["sharp"], assets["heat"], assets["zones"], raw.size,
-                      res.level, height=760)
+        store = st.session_state.setdefault("annotations", {})
+        val = render_viewer(assets["base"], assets["sharp"], assets["heat"], assets["zones"], raw.size,
+                            res.level, img_key=key, saved=store.get(key, []), stage_height=600)
+        if val and val.get("img_key") == key:
+            store[key] = val.get("annotations", [])
         ui.probs_card(res)
     with right:
         ui.triage_card(res, an.settings)
-        ui.certainty_card(res, an.settings)
         from echobreast.inference import draw_contour
         from echobreast.report import build_pdf
 
+        anns = st.session_state.get("annotations", {}).get(key, [])
+        if anns:
+            items = " · ".join(f"Soignant {i} : {LEVELS[x['level']]['label']}" for i, x in enumerate(anns, 1))
+            st.markdown(f"<div class='eb-card' style='border-left:4px solid #8E1D4A'><div class='eb-label'>Annotations du professionnel</div>"
+                        f"<div style='margin-top:.4rem;font-size:.92rem'>{len(anns)} zone(s) ajoutée(s) à la main, incluse(s) dans la fiche PDF.</div>"
+                        f"<div style='color:var(--muted);font-size:.85rem;margin-top:.3rem'>{html.escape(items)}</div></div>",
+                        unsafe_allow_html=True)
         st.write("")
-        st.download_button("Télécharger la fiche PDF", build_pdf(draw_contour(raw, res.mask, res.level), res,
-                                                                  an.settings.model_version, name),
+        st.download_button("Télécharger la fiche PDF", build_pdf(draw_contour(raw, res.mask, res.level, annotations=anns, labels=True),
+                                                                  res, an.settings.model_version, name, annotations=anns),
                            file_name=f"echobreast_{Path(name).stem}.pdf", mime="application/pdf", type="primary",
                            icon=":material/download:", use_container_width=True)
         if truth:
@@ -275,8 +293,7 @@ def page_priorite():
         from echobreast.report import build_queue_pdf
 
         st.download_button("Exporter la file (PDF)", build_queue_pdf(
-            [{"name": r["name"], "level": r["res"].level, "p": r["res"].p_malignant, "conf": r["res"].confidence,
-              "relu": r["relu"]} for r in rows], an.settings.model_version),
+            [{"name": r["name"], "level": r["res"].level, "p": r["res"].p_malignant, "relu": r["relu"]} for r in rows], an.settings.model_version),
             file_name="echobreast_file_priorite.pdf", mime="application/pdf", icon=":material/ios_share:",
             use_container_width=True)
 
@@ -296,25 +313,21 @@ def page_priorite():
         sel_key = shown[0]["key"] if shown else rows[0]["key"]
     left, right = st.columns([1.75, 1], gap="medium")
     with left:
-        st.markdown("<div class='eb-qhead'><span>Rang</span><span>Coupe</span><span>Examen</span>"
-                    "<span class='st'>Niveau</span><span class='pm'>Risque estimé</span></div>",
-                    unsafe_allow_html=True)
+        st.markdown("<div class='eb-qhead'><span>Rang</span><span>Coupe</span>"
+                    "<span>Examen · niveau · risque estimé</span></div>", unsafe_allow_html=True)
         if not shown:
             st.caption("Aucun examen pour ce filtre.")
         for r in shown:
             res, lv = r["res"], LEVELS[r["res"].level]
             rank = rows.index(r) + 1
-            conf_lbl, conf_key = ui.confidence_level(res.confidence, an.settings.min_confidence)
             sel = r["key"] == sel_key
             with st.container(border=True):
                 a, b = st.columns([9, 1.1], vertical_alignment="center")
                 a.markdown(f"""<div class='eb-q {'eb-done' if r['relu'] else ''}' style='--c:{lv['color']}'>
 <span class='rk {'top' if rank == 1 else ''}'>{rank:02d}</span><img src='{r['entry']['thumb']}' alt='Miniature'>
-<div style='min-width:0'><div class='ref'>{html.escape(r['name'])}{' ✓' if r['relu'] else ''}</div><div class='meta'>{meta(r['entry'], r['demo'])}</div></div>
-<div class='st'>{ui.badge(res.level, 'sm')}</div>
-<div class='pm'><b>{ui.pct(res.p_malignant)}</b>
-<div class='eb-track'><div style='width:{res.p_malignant * 100:.0f}%;background:{lv['color']}'></div></div>
-<span class='eb-chip {conf_key}'>certitude {conf_lbl.lower()}</span></div></div>""",
+<div class='info'><div class='ref'>{html.escape(r['name'])}{' ✓' if r['relu'] else ''}</div><div class='meta'>{meta(r['entry'], r['demo'])}</div>
+<div class='line'>{ui.badge(res.level, 'sm')}<span class='risk'><b>{ui.pct(res.p_malignant)}</b>
+<span class='eb-track'><span style='width:{res.p_malignant * 100:.0f}%;background:{lv['color']}'></span></span></span></div></div></div>""",
                            unsafe_allow_html=True)
                 if b.button("›" if not sel else "●", key=f"sel_{r['key']}", type="primary" if sel else "secondary",
                             help="Aperçu rapide"):
@@ -328,8 +341,9 @@ def page_priorite():
     with right:
         r = next(x for x in rows if x["key"] == sel_key)
         res, lv, entry = r["res"], LEVELS[r["res"].level], r["entry"]
-        conf_lbl, _ = ui.confidence_level(res.confidence, an.settings.min_confidence)
         n_zones = len(find_zones(res.mask, None, (entry["raw"].height, entry["raw"].width)))
+        n_ann = len(st.session_state.get("annotations", {}).get(r["key"], []))
+        n_ann_txt = f" · {n_ann} zone(s) ajoutée(s) par le soignant" if n_ann else ""
         crit = "".join(f"<div class='eb-crit'>{ui.icon('triangle-alert', 16, lv['color'])}<span>{html.escape(x)}</span></div>"
                        for x in res.reasons)
         with st.container(border=True):
@@ -338,8 +352,7 @@ def page_priorite():
             st.image(entry["preview"], use_container_width=True)
             st.markdown(f"""<div class='eb-row' style='margin-top:.6rem'>{ui.badge(res.level, 'sm')}
 <span class='eb-big' style='font-size:2rem'>{ui.pct(res.p_malignant, '&thinsp;')}</span></div>{crit}
-<div class='eb-row' style='margin-top:.8rem;color:var(--muted);font-size:.86rem'><span>{n_zones} lésion(s) repérée(s)</span>
-<span>certitude du modèle : {conf_lbl.lower()}</span></div>""", unsafe_allow_html=True)
+<div style='margin-top:.8rem;color:var(--muted);font-size:.86rem'>{n_zones} lésion(s) repérée(s) par l'IA{n_ann_txt}</div>""", unsafe_allow_html=True)
             st.write("")
             if st.button("Ouvrir dans la visionneuse complète", type="primary", icon=":material/open_in_new:",
                          use_container_width=True):

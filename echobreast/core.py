@@ -157,8 +157,9 @@ def risk_level(probs: np.ndarray, s: Settings) -> tuple[str, list[str]]:
         reasons.append(f"Le modèle estime à {fmt_pct(p_mal)} la probabilité d'une lésion maligne. C'est au-dessus de "
                        f"{s.t_orange:.0%}, le seuil de vigilance choisi pour ne laisser passer presque aucun cancer.")
     if conf < s.min_confidence:
-        reasons.append("Le modèle hésite entre plusieurs réponses : son résultat est peu sûr, "
-                       "une relecture est conseillée.")
+        (i, pa), (j, pb) = sorted(enumerate(probs), key=lambda t: -t[1])[:2]
+        reasons.append(f"Le modèle hésite entre « {CLASSES[i]} » ({fmt_pct(pa)}) et « {CLASSES[j]} » ({fmt_pct(pb)}) : "
+                       "résultat incertain. Par prudence, l'examen passe en orange.")
     if reasons:
         return "orange", reasons
     return "vert", [f"Le modèle estime à {fmt_pct(p_mal)} la probabilité d'une lésion maligne, "

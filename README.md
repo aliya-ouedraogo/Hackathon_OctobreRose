@@ -34,6 +34,9 @@ Règle de couleur : **rouge** si p(maligne) ≥ `t_red` ; **orange** si p(malign
   Lanczos. **Avant / après IA** : curseur entre l'image brute et la même image avec les tracés de l'IA.
   Ces vues sont signalées « Amélioration visuelle uniquement — l'analyse utilise l'image originale ».
   Pas de super-résolution par IA : elle inventerait des détails, ce qui est dangereux en imagerie médicale.
+- **Annotations du professionnel** : bouton « Annoter », choix du niveau (Prioritaire / À relire / Risque faible), tracé à
+  la main sur l'image. Tracés bordés de blanc et étiquetés « Soignant » (ceux de l'IA portent « IA »). « Enregistrer » /
+  « Annuler les modifications » ; les zones enregistrées figurent dans la fiche PDF. Gardées le temps de la session uniquement.
 - **File de priorité** : filtres avec compteurs, recherche, aperçu rapide, statut « relu » (gardé pendant la session),
   export PDF de la file.
 
@@ -44,7 +47,7 @@ echobreast/   code partagé (prétraitement, modèles, règle de couleur, zones,
 scripts/      préparation des données, entraînement, évaluation
 app/app.py    pages : Analyser, File de priorité, Fiabilité & limites (+ Octobre Rose)
 app/ui.py     design system : couleurs, badges, icônes, jauge à seuils, cartes
-app/viewer.py visionneuse (zoom, zones, loupe, Netteté, avant / après IA)
+app/viewer.py + app/viewer_component/  visionneuse (composant Streamlit : zoom, zones, loupe, Netteté, avant / après IA, annotations)
 app/static/   polices embarquées (Newsreader, Inter, IBM Plex Mono), ruban, illustration
 models/       classifier.pt, segmenter.pt, settings.json, metrics.json
 docs/PITCH.md script minuté du pitch de 5 min

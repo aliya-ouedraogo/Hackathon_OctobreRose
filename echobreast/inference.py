@@ -183,24 +183,56 @@ def _hex(c: str) -> tuple[int, int, int]:
     return tuple(int(c[i:i + 2], 16) for i in (1, 3, 5))
 
 
+def _label(img: np.ndarray, text: str, x: int, y: int, fg, bg, border, scale: float):
+    """Petite étiquette lisible (texte ASCII) posée au-dessus d'une zone."""
+    font, th = cv2.FONT_HERSHEY_SIMPLEX, max(1, round(scale * 2))
+    (tw, tht), base = cv2.getTextSize(text, font, scale, th)
+    pad = max(3, round(scale * 8))
+    x0 = int(min(max(0, x - tw // 2 - pad), img.shape[1] - tw - 2 * pad - 1))
+    y1 = int(max(tht + 2 * pad, y - pad))
+    y0 = y1 - tht - 2 * pad
+    cv2.rectangle(img, (x0, y0), (x0 + tw + 2 * pad, y1), bg, -1)
+    cv2.rectangle(img, (x0, y0), (x0 + tw + 2 * pad, y1), border, max(1, th - 1))
+    cv2.putText(img, text, (x0 + pad, y1 - pad), font, scale, fg, th, cv2.LINE_AA)
+
+
 def draw_contour(raw: Image.Image, mask: np.ndarray | None, level: str, width: int | None = None,
-                 target: int = 1024) -> Image.Image:
-    """Image agrandie + contour lissé, anticrénelé, avec halo lumineux (PDF, vignettes)."""
+                 target: int = 1024, annotations: list[dict] | None = None, labels: bool = False) -> Image.Image:
+    """Image agrandie + contour de l'IA (halo lumineux) + zones ajoutées par le professionnel.
+
+    Les zones du professionnel sont bordées de blanc et étiquetées « Soignant », celles de l'IA « IA »,
+    pour ne jamais les confondre (fiche PDF, vignettes)."""
     base = enhance_for_display(raw, target)
     out = np.asarray(base.convert("RGB")).copy()
-    if mask is None:
-        return Image.fromarray(out)
     sx = base.width / raw.width
-    big = cv2.resize(mask.astype(np.uint8), base.size, interpolation=cv2.INTER_NEAREST)
-    cnts, _ = cv2.findContours(big, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    cnts = [cv2.approxPolyDP(c, 1.5 * sx, True) for c in cnts]
-    col = _hex(LEVELS[level]["color"])
     wd = width or max(2, round(base.width / 300))
-    glow = np.zeros_like(out)
-    cv2.drawContours(glow, cnts, -1, col, wd * 5, cv2.LINE_AA)
-    glow = cv2.GaussianBlur(glow, (0, 0), wd * 2.5)
-    out = np.clip(out.astype(np.int16) + glow.astype(np.int16) * 0.8, 0, 255).astype(np.uint8)
-    cv2.drawContours(out, cnts, -1, col, wd, cv2.LINE_AA)
+    scale = base.width / 900
+    if mask is not None:
+        big = cv2.resize(mask.astype(np.uint8), base.size, interpolation=cv2.INTER_NEAREST)
+        cnts, _ = cv2.findContours(big, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        cnts = [cv2.approxPolyDP(c, 1.5 * sx, True) for c in cnts]
+        col = _hex(LEVELS[level]["color"])
+        glow = np.zeros_like(out)
+        cv2.drawContours(glow, cnts, -1, col, wd * 5, cv2.LINE_AA)
+        glow = cv2.GaussianBlur(glow, (0, 0), wd * 2.5)
+        out = np.clip(out.astype(np.int16) + glow.astype(np.int16) * 0.8, 0, 255).astype(np.uint8)
+        cv2.drawContours(out, cnts, -1, col, wd, cv2.LINE_AA)
+        if labels:
+            for c in cnts:
+                if cv2.contourArea(c) < 0.002 * big.size:
+                    continue
+                x, y, w, _ = cv2.boundingRect(c)
+                _label(out, "IA", x + w // 2, y - wd * 2, (255, 255, 255), col, col, scale)
+    for i, a in enumerate(annotations or [], 1):
+        pts = np.array([[round(px * sx), round(py * sx)] for px, py in a["points"]], np.int32).reshape(-1, 1, 2)
+        if len(pts) < 3:
+            continue
+        col = _hex(LEVELS[a["level"]]["color"])
+        cv2.polylines(out, [pts], True, (255, 255, 255), wd * 3, cv2.LINE_AA)
+        cv2.polylines(out, [pts], True, col, wd + 1, cv2.LINE_AA)
+        if labels:
+            x, y, w, _ = cv2.boundingRect(pts)
+            _label(out, f"Soignant {i}", x + w // 2, y - wd * 2, col, (255, 255, 255), col, scale)
     return Image.fromarray(out)
 
 

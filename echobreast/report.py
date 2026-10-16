@@ -22,7 +22,8 @@ def _latin1(text: str) -> str:
     return text.encode("latin-1", "replace").decode("latin-1")
 
 
-def build_pdf(annotated: Image.Image, result, model_version: str, case_name: str = "examen") -> bytes:
+def build_pdf(annotated: Image.Image, result, model_version: str, case_name: str = "examen",
+              annotations: list[dict] | None = None) -> bytes:
     lv = LEVELS[result.level]
     pdf = FPDF(format="A4")
     pdf.set_auto_page_break(True, 15)
@@ -77,14 +78,23 @@ def build_pdf(annotated: Image.Image, result, model_version: str, case_name: str
         pdf.set_x(x0)
     pdf.ln(2)
     pdf.set_x(x0)
-    pdf.cell(83, 6, _latin1(f"Certitude du modèle : {result.confidence * 100:.0f}/100"), new_x="LEFT", new_y="NEXT")
     pdf.set_font("Helvetica", "I", 9)
     for reason in result.reasons + result.warnings:
         pdf.set_x(x0)
         pdf.multi_cell(83, 4.5, _latin1("- " + reason), align="L", new_x="LEFT", new_y="NEXT")
     pdf.set_x(x0)
-    pdf.multi_cell(83, 4.5, _latin1("Contour : " + ("lésion repérée, tracée dans la couleur du niveau" if result.mask is not None
-                                                    else "aucun contour affiché")), new_x="LEFT", new_y="NEXT")
+    pdf.multi_cell(83, 4.5, _latin1("Contour de l'IA (étiquette « IA ») : " + ("lésion repérée, tracée dans la couleur du niveau"
+                                    if result.mask is not None else "aucun contour")), align="L", new_x="LEFT", new_y="NEXT")
+    if annotations:
+        pdf.ln(2)
+        pdf.set_x(x0)
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.multi_cell(83, 5, _latin1("Zones ajoutées par le professionnel (étiquette « Soignant »)"), align="L",
+                       new_x="LEFT", new_y="NEXT")
+        pdf.set_font("Helvetica", "", 9)
+        for i, a in enumerate(annotations, 1):
+            pdf.set_x(x0)
+            pdf.cell(83, 5, _latin1(f"Soignant {i} : {LEVELS[a['level']]['label']}"), new_x="LEFT", new_y="NEXT")
 
     pdf.set_xy(12, max(pdf.get_y(), 140) + 6)
     pdf.set_font("Helvetica", "B", 11)
@@ -102,7 +112,7 @@ def build_pdf(annotated: Image.Image, result, model_version: str, case_name: str
 
 
 def build_queue_pdf(rows: list[dict], model_version: str) -> bytes:
-    """Récapitulatif de la file de priorité : rang, examen, niveau, p(maligne), confiance, relu."""
+    """Récapitulatif de la file de priorité : rang, examen, niveau, risque estimé, relu."""
     pdf = FPDF(format="A4")
     pdf.set_auto_page_break(True, 18)
     pdf.add_page()
@@ -118,10 +128,10 @@ def build_queue_pdf(rows: list[dict], model_version: str) -> bytes:
     pdf.cell(0, 6, _latin1(f"{dt.datetime.now():%d/%m/%Y %H:%M}   |   Version du modèle : {model_version}   |   "
                            f"{len(rows)} examen(s)"), new_x="LMARGIN", new_y="NEXT")
     pdf.ln(3)
-    widths = [14, 70, 36, 30, 22, 14]
+    widths = [14, 84, 40, 32, 16]
     pdf.set_font("Helvetica", "B", 10)
     pdf.set_fill_color(244, 234, 245)
-    for w, h in zip(widths, ["Rang", "Examen", "Niveau", "Risque estimé", "Certitude", "Relu"]):
+    for w, h in zip(widths, ["Rang", "Examen", "Niveau", "Risque estimé", "Relu"]):
         pdf.cell(w, 8, _latin1(h), border=0, fill=True)
     pdf.ln(8)
     pdf.set_font("Helvetica", "", 10)
@@ -134,8 +144,7 @@ def build_queue_pdf(rows: list[dict], model_version: str) -> bytes:
         pdf.cell(widths[2], 8, _latin1(lv["label"]))
         pdf.set_text_color(40, 40, 40)
         pdf.cell(widths[3], 8, f"{r['p']:.0%}")
-        pdf.cell(widths[4], 8, f"{r['conf'] * 100:.0f}/100")
-        pdf.cell(widths[5], 8, "oui" if r.get("relu") else "-", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(widths[4], 8, "oui" if r.get("relu") else "-", new_x="LMARGIN", new_y="NEXT")
         pdf.set_draw_color(239, 225, 234)
         pdf.line(12, pdf.get_y(), 198, pdf.get_y())
     pdf.ln(6)
