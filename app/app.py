@@ -53,7 +53,7 @@ def analyze_bytes(data: bytes):
 
 
 def viewer_assets(key: str):
-    """Vues d'affichage (originale, Netteté), carte d'attention et zones, calculées une seule fois."""
+    """Vues d'affichage (originale, Netteté), carte des zones qui ont pesé, et zones, calculées une seule fois."""
     from echobreast.inference import enhance_for_display, find_zones, heat_rgba
 
     entry = _cache()[key]
@@ -124,13 +124,18 @@ sur 100 images ayant ce score, environ 30 étaient réellement des cancers. Ce n
 - **Trait plein** (couleur du niveau) : contour de la lésion repérée par le modèle. Son nom suit la couleur :
   « Zone suspecte » en rouge, « Zone à vérifier » en orange, « Lésion d'aspect bénin » en vert.
   Un contour en vert ne signale donc pas un danger : le modèle a vu une lésion qu'il juge plutôt bénigne.
-- **Pointillés roses**, bouton « Où l'IA a regardé » : endroits de l'image qui ont le plus influencé le résultat.
-  **À quoi ça sert ?** À vérifier que l'IA s'est appuyée sur la lésion et pas sur autre chose. Si elle regarde surtout un bord
-  de l'image, une inscription ou une ombre, son résultat est moins crédible. Ces zones ne sont pas des lésions confirmées.
+- **Pointillés roses**, bouton « Zones qui ont pesé » : l'IA regarde **toute** l'image, mais certains endroits comptent
+  plus que d'autres dans son calcul. Ce calque montre ceux qui ont le plus fait monter son estimation du risque de cancer.
+  On n'affiche que les plus marqués, d'où des zones précises plutôt que toute l'image.
+  **À quoi ça sert ?** À contrôler l'IA. Si ces zones tombent sur du tissu mammaire ou la lésion, son raisonnement est cohérent.
+  Si elles tombent **hors du sein** (fond noir, bord, texte, mesures incrustées), le résultat est peu crédible : l'image est
+  sans doute trop différente de celles que l'IA a apprises. Ces zones ne sont pas des lésions confirmées.
 
-#### 5. Netteté et Comparer
-Ces vues réduisent le grain de l'échographie pour mieux voir. Elles servent **uniquement à l'œil** :
-le modèle analyse toujours l'image originale.
+#### 5. Avant / après IA, et Netteté
+- **Avant / après IA** : un curseur sépare l'image brute (à gauche, sans aucun tracé) et la même image avec l'analyse de l'IA
+  (à droite, contours et zones). Faites-le glisser pour vérifier ce que l'IA a ajouté.
+- **Netteté** : réduit le grain de l'échographie pour mieux voir. Elle sert **uniquement à l'œil** : le modèle analyse
+  toujours l'image originale.
 
 #### 6. Ce que l'outil ne fait pas
 Il ne pose pas de diagnostic, ne mesure pas la taille en mm et n'a pas été validé sur des patientes du Burkina Faso.
@@ -187,13 +192,13 @@ def page_analyse():
     for w in res.warnings:
         st.warning(w, icon=":material/warning:")
 
-    lg, gb = st.columns([5, 1.15], vertical_alignment="center")
-    with lg:
+    with st.container(border=True, key="legend_box"):
+        lh, lb = st.columns([3, 1], vertical_alignment="center")
+        lh.markdown("<div class='eb-label'>Légende</div>", unsafe_allow_html=True)
+        with lb:
+            if st.button("Guide de lecture", icon=":material/menu_book:", type="primary", key="guide_btn"):
+                reading_guide(an.settings)
         ui.legend()
-    with gb:
-        if st.button("Guide de lecture", icon=":material/menu_book:", type="primary", use_container_width=True):
-            reading_guide(an.settings)
-    st.write("")
 
     left, right = st.columns([1.7, 1], gap="medium")
     with left:
@@ -203,9 +208,10 @@ def page_analyse():
 
         render_viewer(assets["base"], assets["sharp"], assets["heat"], assets["zones"], raw.size,
                       res.level, height=760)
+        ui.probs_card(res)
     with right:
         ui.triage_card(res, an.settings)
-        ui.probs_card(res, an.settings)
+        ui.certainty_card(res, an.settings)
         from echobreast.inference import draw_contour
         from echobreast.report import build_pdf
 
@@ -291,7 +297,7 @@ def page_priorite():
     left, right = st.columns([1.75, 1], gap="medium")
     with left:
         st.markdown("<div class='eb-qhead'><span>Rang</span><span>Coupe</span><span>Examen</span>"
-                    "<span class='st'>Niveau</span><span class='pm'>Risque estimé</span><span></span></div>",
+                    "<span class='st'>Niveau</span><span class='pm'>Risque estimé</span></div>",
                     unsafe_allow_html=True)
         if not shown:
             st.caption("Aucun examen pour ce filtre.")
@@ -301,13 +307,14 @@ def page_priorite():
             conf_lbl, conf_key = ui.confidence_level(res.confidence, an.settings.min_confidence)
             sel = r["key"] == sel_key
             with st.container(border=True):
-                a, b = st.columns([12, 1], vertical_alignment="center")
+                a, b = st.columns([9, 1.1], vertical_alignment="center")
                 a.markdown(f"""<div class='eb-q {'eb-done' if r['relu'] else ''}' style='--c:{lv['color']}'>
 <span class='rk {'top' if rank == 1 else ''}'>{rank:02d}</span><img src='{r['entry']['thumb']}' alt='Miniature'>
 <div style='min-width:0'><div class='ref'>{html.escape(r['name'])}{' ✓' if r['relu'] else ''}</div><div class='meta'>{meta(r['entry'], r['demo'])}</div></div>
 <div class='st'>{ui.badge(res.level, 'sm')}</div>
-<div class='pm'><b>{ui.pct(res.p_malignant)}</b> <span class='eb-chip {conf_key}'>certitude {conf_lbl.lower()}</span>
-<div class='eb-track'><div style='width:{res.p_malignant * 100:.0f}%;background:{lv['color']}'></div></div></div><span></span></div>""",
+<div class='pm'><b>{ui.pct(res.p_malignant)}</b>
+<div class='eb-track'><div style='width:{res.p_malignant * 100:.0f}%;background:{lv['color']}'></div></div>
+<span class='eb-chip {conf_key}'>certitude {conf_lbl.lower()}</span></div></div>""",
                            unsafe_allow_html=True)
                 if b.button("›" if not sel else "●", key=f"sel_{r['key']}", type="primary" if sel else "secondary",
                             help="Aperçu rapide"):
@@ -353,9 +360,43 @@ def pct(x, d=1):
     return "n.d." if x is None else f"{x * 100:.{d}f} %"
 
 
+def wilson(k: int, n: int, z: float = 1.96):
+    if n == 0:
+        return None
+    p = k / n
+    d = 1 + z * z / n
+    c = (p + z * z / (2 * n)) / d
+    h = z * ((p * (1 - p) / n + z * z / (4 * n * n)) ** 0.5) / d
+    return [max(0.0, c - h), min(1.0, c + h)]
+
+
+def complete_metrics(m: dict) -> dict:
+    """Complète un metrics.json produit par une ancienne version d'evaluate.py.
+
+    La matrice « signalé / pas signalé » et les fourchettes se déduisent des couleurs par classe réelle.
+    La courbe de calibration, elle, demande de relancer l'évaluation.
+    """
+    m = dict(m)
+    col = m.get("couleurs_par_classe_reelle")
+    if "matrice_alerte" not in m and col:
+        mal = col.get("maligne", {})
+        others = [v for k, v in col.items() if k != "maligne"]
+        tp = mal.get("orange", 0) + mal.get("rouge", 0)
+        fn = mal.get("vert", 0)
+        fp = sum(o.get("orange", 0) + o.get("rouge", 0) for o in others)
+        tn = sum(o.get("vert", 0) for o in others)
+        m["matrice_alerte"] = {"vp": tp, "fn": fn, "fp": fp, "vn": tn}
+    mx = m.get("matrice_alerte")
+    if "ic95" not in m and mx:
+        m["ic95"] = {"sensibilite": wilson(mx["vp"], mx["vp"] + mx["fn"]),
+                     "specificite": wilson(mx["vn"], mx["vn"] + mx["fp"])}
+    return m
+
+
 def page_limites():
     top("Fiabilité & limites")
     m = load_metrics()
+    m = complete_metrics(m) if m else None
     an = get_analyzer()
     ui.header("Transparence et évaluation", "Fiabilité & limites",
               "Ce que le modèle sait faire, mesuré une seule fois sur un jeu de test jamais vu, et ce qu'il ne faut pas lui demander.")
@@ -410,13 +451,21 @@ Les fausses alertes coûtent une relecture de plus, mais ne font pas rater de ca
                 diag = alt.Chart(pd.DataFrame({"x": [0, 1], "y": [0, 1]})).mark_line(strokeDash=[4, 4], color="#CDB7C6").encode(
                     x=alt.X("x", title="Risque annoncé par l'IA", scale=alt.Scale(domain=[0, 1]), axis=alt.Axis(format="%")),
                     y=alt.Y("y", title="Cancers réellement observés", scale=alt.Scale(domain=[0, 1]), axis=alt.Axis(format="%")))
-                chart = diag
-                if not cal.empty:
-                    base = alt.Chart(cal).encode(x="predite", y="observee", tooltip=["predite", "observee", "n"])
+                if cal.empty:
+                    st.markdown(f"<div class='eb-guide' style='margin-top:.6rem'>{ui.icon('info', 16, ui.WINE)}<div>"
+                                "<b>Courbe non disponible</b>Ces mesures ont été calculées avec une ancienne version du script "
+                                "d'évaluation. Relancez <code>scripts/evaluate.py</code> (sans réentraîner) pour obtenir la courbe.</div></div>",
+                                unsafe_allow_html=True)
+                else:
+                    base = alt.Chart(cal).encode(
+                        x="predite", y="observee",
+                        tooltip=[alt.Tooltip("predite", title="Risque annoncé", format=".0%"),
+                                 alt.Tooltip("observee", title="Cancers observés", format=".0%"),
+                                 alt.Tooltip("n", title="Nombre d'images")])
                     chart = diag + base.mark_line(color=ui.WINE, strokeWidth=2.5) + base.mark_circle(color=ui.WINE, size=70)
-                st.altair_chart(chart.properties(height=230).configure_view(strokeWidth=0)
-                                .configure_axis(labelColor="#6F6271", titleColor="#6F6271", gridColor="#F1E6EE"),
-                                use_container_width=True)
+                    st.altair_chart(chart.properties(height=260).configure_view(strokeWidth=0)
+                                    .configure_axis(labelColor="#6F6271", titleColor="#6F6271", gridColor="#F1E6EE"),
+                                    use_container_width=True)
                 st.caption(f"Si la courbe suit la diagonale, un risque annoncé de 30 % correspond bien à environ 30 cancers sur 100 images. "
                            f"Écart moyen constaté : {m['ece_apres_calibration'] * 100:.0f} points.")
 
@@ -445,7 +494,7 @@ Les fausses alertes coûtent une relecture de plus, mais ne font pas rater de ca
                ("scale", "Biais documentés", "Des études rapportent plus de faux positifs de certains systèmes d'IA en imagerie "
                 "mammaire chez les femmes noires et les patientes plus âgées."),
                ("ruler", "Pas de mesure en mm", "L'échelle de l'image est inconnue : aucune taille réelle n'est calculée."),
-               ("eye", "Zones d'attention", "Elles montrent ce qui a influencé le modèle, pas une lésion confirmée."),
+               ("eye", "Zones qui ont pesé", "Elles montrent ce qui a le plus compté dans le calcul de l'IA, pas une lésion confirmée."),
                ("image-up", "Netteté = affichage", "Réduction du grain et agrandissement pour l'œil humain uniquement ; "
                 "l'analyse porte sur l'image originale."),
                ("info", "Petit jeu déséquilibré", "Seulement 210 images de cancers : les chiffres ont une marge d'incertitude importante.")]

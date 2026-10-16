@@ -62,6 +62,7 @@ html,body{margin:0;height:100%;font-family:'Inter',system-ui,sans-serif;color:va
 .tag::after{content:"";position:absolute;left:50%;top:100%;width:1.5px;height:12px;background:var(--c);opacity:.8}
 .tag.att{background:rgba(22,14,20,.8);color:#F4C6DA;border:1px dashed #F472B6;box-shadow:none}
 .tag.att::after{background:#F472B6}
+.tag.cut{opacity:0;pointer-events:none}
 /* loupe */
 .loupe{position:absolute;right:12px;bottom:44px;display:flex;gap:10px;align-items:flex-end;z-index:4;pointer-events:none;opacity:0;transition:opacity .25s}
 .loupe.on{opacity:1}
@@ -69,8 +70,6 @@ html,body{margin:0;height:100%;font-family:'Inter',system-ui,sans-serif;color:va
 .loupe .lt{color:#fff;font:600 13px 'Inter';text-shadow:0 1px 4px #000;max-width:150px}
 .loupe .lt small{display:block;font:500 11px 'IBM Plex Mono';color:#D9C6D1;margin-top:3px}
 /* comparaison */
-.cmp{position:absolute;inset:0;overflow:hidden;pointer-events:none}
-.cmp .clip{position:absolute;inset:0;clip-path:inset(0 0 0 50%)}
 .split{position:absolute;top:0;bottom:0;width:2px;background:#fff;z-index:4;cursor:ew-resize;box-shadow:0 0 12px rgba(0,0,0,.6)}
 .split::before{content:"‹ ›";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;color:var(--wine);
   font:700 13px 'Inter';border-radius:999px;padding:6px 9px;box-shadow:0 4px 14px rgba(0,0,0,.4)}
@@ -104,7 +103,6 @@ html,body{margin:0;height:100%;font-family:'Inter',system-ui,sans-serif;color:va
     <img id="imgBase" src="__BASE__" alt="Échographie">
     <img id="imgSharp" class="hidden" alt="">
     <img id="imgHeat" class="hidden" alt="">
-    <div class="cmp hidden" id="cmp"><div class="clip" id="clip"><img id="imgCmp" alt="" style="position:absolute;inset:0;width:100%;height:100%"></div></div>
     <svg id="ov" viewBox="0 0 __W__ __H__" preserveAspectRatio="none">
       <defs><filter id="glow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="__BLUR__" result="b"/>
         <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
@@ -113,7 +111,7 @@ html,body{margin:0;height:100%;font-family:'Inter',system-ui,sans-serif;color:va
   </div>
   <div class="tags" id="tags"></div>
   <div class="split hidden" id="split"></div>
-  <span class="lbl hidden" id="lblL" style="left:12px">ORIGINALE</span><span class="lbl hidden" id="lblR" style="right:12px">NETTETÉ</span>
+  <span class="lbl hidden" id="lblL" style="left:12px">AVANT L'IA · image brute</span><span class="lbl hidden" id="lblR" style="right:12px">APRÈS L'IA · analyse</span>
   <div class="tools">
     <div class="tb" role="group" aria-label="Zoom">
       <button class="b" id="zOut" aria-label="Dézoomer">−</button><span class="zv" id="zv">100 %</span>
@@ -123,9 +121,9 @@ html,body{margin:0;height:100%;font-family:'Inter',system-ui,sans-serif;color:va
     </div>
     <div class="tb" role="group" aria-label="Calques">
       <button class="b" id="tContour" aria-pressed="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg><span class="tx">Contour</span></button>
-      <button class="b" id="tAtt" aria-pressed="false"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg><span class="tx">Où l'IA a regardé</span></button>
+      <button class="b" id="tAtt" aria-pressed="false"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg><span class="tx">Zones qui ont pesé</span></button>
       <button class="b" id="tSharp" aria-pressed="false" title="Amélioration visuelle uniquement"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4M19 14v4M10 2v2M7 8H3M21 16h-4M11 3H9"/></svg><span class="tx">Netteté</span></button>
-      <button class="b" id="tCmp" aria-pressed="false"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18"/></svg><span class="tx">Comparer</span></button>
+      <button class="b" id="tCmp" aria-pressed="false"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18"/></svg><span class="tx">Avant / après IA</span></button>
     </div>
   </div>
   <div class="mini" id="mini"><div class="t">VUE GLOBALE <i></i></div><div class="box"><img src="__BASE__" alt=""><div class="r" id="miniR"></div></div></div>
@@ -146,7 +144,7 @@ const $=id=>document.getElementById(id), stage=$('stage'), view=$('view'), NS='h
 let fit=1, s=1, tx=0, ty=0, cur=-1, split=.5, loupeOn=true, hover=null;
 const imgBase=$('imgBase'), imgSharp=$('imgSharp');
 const zoneColor=z=>z.kind==='lesion'?LVL:'#F472B6';
-const zoneName=(z,i)=>z.kind==='lesion'?`${LES} ${i+1}`:`Regard de l'IA ${i+1}`;
+const zoneName=(z,i)=>z.kind==='lesion'?`${LES} ${i+1}`:`Zone d'influence ${i+1}`;
 const pressed=id=>$(id).getAttribute('aria-pressed')==='true';
 function rect(){return stage.getBoundingClientRect();}
 function layout(){const th=document.querySelector('.tools').offsetHeight+20; $('mini').style.top=th+'px'; $('lblL').style.top=th+'px'; $('lblR').style.top=th+'px'; const r=rect(); fit=Math.min(r.width/W,r.height/H); view.style.width=(W*fit)+'px'; view.style.height=(H*fit)+'px';}
@@ -161,7 +159,7 @@ function apply(anim){
   Object.assign($('miniR').style,{left:x0*100+'%',top:y0*100+'%',width:(x1-x0)*100+'%',height:(y1-y0)*100+'%'});
   const place=()=>{document.querySelectorAll('.tag').forEach(t=>{const z=ZONES[+t.dataset.i],[x,y,w]=z.bbox;
     t.style.left=(tx+(x+w/2)*fit*s)+'px'; t.style.top=(ty+y*fit*s)+'px';});
-    const sx=tx+split*W*fit*s; $('split').style.left=(sx-1)+'px'; drawLoupe();};
+    const sx=tx+split*W*fit*s; $('split').style.left=(sx-1)+'px'; cmpClip(sx); drawLoupe();};
   if(anim){setTimeout(place,560);} place();
 }
 function zoomAt(f,cx,cy,anim){const ns=Math.min(10,Math.max(1,s*f)); tx=cx-(cx-tx)*ns/s; ty=cy-(cy-ty)*ns/s; s=ns; apply(anim);}
@@ -180,7 +178,7 @@ function caption(){
   const z=ZONES[cur];
   c.innerHTML=z.kind==='lesion'
    ?`<b>Zone ${cur+1} : ${LVK==='vert'?'lésion repérée, d\'aspect plutôt bénin pour l\'IA':LVK==='rouge'?'lésion repérée, jugée suspecte par l\'IA':'lésion repérée, à vérifier'}.</b> Elle occupe ${z.area_pct.toFixed(1).replace('.',',')} % de l'image. Sa taille réelle en mm ne peut pas être mesurée.`
-   :`<b>Zone ${cur+1} : endroit où l'IA a beaucoup regardé</b>, en dehors de la lésion repérée. Cela sert à vérifier son raisonnement : si l'IA regarde un bord de l'image, un texte ou une ombre plutôt qu'une lésion, méfiez-vous du résultat. Ce n'est pas une lésion confirmée.`;
+   :`<b>Zone ${cur+1} : zone qui a beaucoup pesé dans le calcul</b>, en dehors de la lésion repérée. L'IA regarde toute l'image, mais ces endroits ont le plus fait monter son estimation du risque. S'ils tombent sur du tissu mammaire suspect, c'est cohérent ; s'ils tombent hors du sein (fond noir, bord, texte, mesures), le résultat est peu crédible. Ce n'est pas une lésion confirmée.`;
 }
 function renderChips(){
   const box=$('chips'); box.innerHTML='';
@@ -202,7 +200,7 @@ function drawZones(){
       Object.entries(a).forEach(([k,v])=>e.setAttribute(k,v)); e.style.strokeWidth=(z.kind==='lesion'?2.4:2)+'px'; grp.appendChild(e);});
     g.appendChild(grp);
     const t=document.createElement('div'); t.className='tag'+(z.kind==='lesion'?'':' att'); t.dataset.i=i; t.dataset.kind=z.kind;
-    t.style.setProperty('--c',col); t.innerHTML=`<span class="n">${i+1}</span>${z.kind==='lesion'?LES:'Regard de l\'IA'}`;
+    t.style.setProperty('--c',col); t.innerHTML=`<span class="n">${i+1}</span>${z.kind==='lesion'?LES:'Influence'}`;
     t.onclick=()=>focusZone(i); tags.appendChild(t);
   });
 }
@@ -229,13 +227,20 @@ function drawLoupe(){
 }
 /* boutons */
 function tog(id){const on=!pressed(id); $(id).setAttribute('aria-pressed',on); return on;}
-function note(){const vis=pressed('tSharp')||pressed('tCmp'); $('note').classList.toggle('vis',vis);
+function note(){const vis=pressed('tSharp'); $('note').classList.toggle('vis',vis);
+  if(pressed('tCmp')&&!vis){$('note').classList.remove('vis'); $('noteT').textContent='Glissez le curseur : à gauche l\u2019image brute, à droite l\u2019analyse de l\u2019IA'; return;}
   $('noteT').textContent=vis?'Amélioration visuelle uniquement : l’analyse utilise l’image originale':'Vue originale';}
 $('tContour').onclick=()=>{setVisible('lesion',tog('tContour')); drawLoupe();};
 $('tAtt').onclick=()=>{const on=tog('tAtt'); const im=$('imgHeat'); if(on&&!im.src) im.src=HEAT; im.classList.toggle('hidden',!on); setVisible('attention',on); drawLoupe();};
-$('tSharp').onclick=()=>{const on=tog('tSharp'); if(on&&!imgSharp.src){imgSharp.src=SHARP; imgSharp.onload=drawLoupe;} imgSharp.classList.toggle('hidden',!on||pressed('tCmp')); note(); drawLoupe();};
-$('tCmp').onclick=()=>{const on=tog('tCmp'); const im=$('imgCmp'); if(on&&!im.src) im.src=SHARP;
-  ['cmp','split','lblL','lblR'].forEach(k=>$(k).classList.toggle('hidden',!on)); imgSharp.classList.toggle('hidden',on||!pressed('tSharp')); note(); apply(false);};
+$('tSharp').onclick=()=>{const on=tog('tSharp'); if(on&&!imgSharp.src){imgSharp.src=SHARP; imgSharp.onload=drawLoupe;} imgSharp.classList.toggle('hidden',!on); note(); drawLoupe();};
+$('tCmp').onclick=()=>{const on=tog('tCmp'); if(on&&!pressed('tContour')) $('tContour').click();
+  ['split','lblL','lblR'].forEach(k=>$(k).classList.toggle('hidden',!on)); note(); apply(false);};
+/* Avant / après IA : à gauche du curseur l'image brute, à droite les tracés de l'IA */
+function cmpClip(sx){
+  const on=pressed('tCmp'), c=on?`inset(0 0 0 ${split*100}%)`:'';
+  $('ov').style.clipPath=c; $('imgHeat').style.clipPath=c;
+  document.querySelectorAll('.tag').forEach(t=>t.classList.toggle('cut',on&&parseFloat(t.style.left)<sx));
+}
 $('zIn').onclick=()=>{const r=rect(); zoomAt(1.5,r.width/2,r.height/2,true);};
 $('zOut').onclick=()=>{const r=rect(); zoomAt(1/1.5,r.width/2,r.height/2,true);};
 $('zFit').onclick=()=>focusZone(-1);
@@ -249,7 +254,7 @@ stage.addEventListener('dblclick',e=>{if(e.target.closest('button,.tag'))return;
 const pts=new Map(); let last=null,pinch=null,dragSplit=false;
 $('split').addEventListener('pointerdown',e=>{dragSplit=true; e.stopPropagation(); $('split').setPointerCapture(e.pointerId);});
 $('split').addEventListener('pointermove',e=>{if(!dragSplit)return; const r=rect(); split=Math.min(1,Math.max(0,((e.clientX-r.left)-tx)/(W*fit*s)));
-  $('clip').style.clipPath=`inset(0 0 0 ${split*100}%)`; apply(false);});
+  apply(false);});
 $('split').addEventListener('pointerup',()=>dragSplit=false);
 stage.addEventListener('pointerdown',e=>{if(e.target.closest('button,.tag,.split'))return; stage.setPointerCapture(e.pointerId); pts.set(e.pointerId,{x:e.clientX,y:e.clientY}); stage.classList.add('drag'); last={x:e.clientX,y:e.clientY};});
 stage.addEventListener('pointermove',e=>{

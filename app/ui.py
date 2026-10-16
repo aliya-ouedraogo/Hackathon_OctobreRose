@@ -110,6 +110,9 @@ div[data-baseweb="select"]>div, [data-testid="stTextInput"] input{ border-radius
 .eb-badge.sm{ font-size:.8rem; padding:.2rem .6rem .2rem .5rem; }
 
 /* Légende et guide */
+.st-key-legend_box{ background:#fff; box-shadow:var(--shadow); margin-bottom:.6rem; }
+.st-key-guide_btn{ display:flex; justify-content:flex-end; }
+.st-key-guide_btn button{ min-height:38px; padding:.35rem 1rem; }
 .eb-legend{ background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:.8rem 1rem; box-shadow:var(--shadow); }
 .eb-leg{ display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:.5rem 1.2rem; }
 .eb-leg2{ margin-top:.6rem; padding-top:.6rem; border-top:1px dashed var(--line); }
@@ -158,7 +161,9 @@ div[data-baseweb="select"]>div, [data-testid="stTextInput"] input{ border-radius
 .eb-ban{ padding:0; margin:.4rem 0 0; }
 
 /* File de priorité */
-.eb-q{ display:grid; grid-template-columns:2.9rem 64px minmax(0,1.6fr) minmax(0,1fr) minmax(0,1fr) auto; gap:.9rem; align-items:center; }
+.eb-q{ display:grid; grid-template-columns:2.6rem 64px minmax(0,1.5fr) minmax(0,1fr) minmax(120px,1fr); gap:.9rem; align-items:center; }
+.eb-q .pm .eb-track{ margin:.3rem 0 .4rem; }
+.eb-q .pm .eb-chip{ white-space:nowrap; }
 .eb-q .rk{ font-family:var(--mono); color:var(--muted); font-size:.95rem; }
 .eb-q .rk.top{ color:var(--wine); font-weight:600; }
 .eb-q img{ width:64px; height:48px; object-fit:cover; border-radius:8px; border:1.5px solid var(--c); }
@@ -168,7 +173,7 @@ div[data-baseweb="select"]>div, [data-testid="stTextInput"] input{ border-radius
 .eb-chip{ display:inline-block; font-size:.78rem; padding:.18rem .55rem; border-radius:8px; background:var(--lav); color:#5B2A6E; }
 .eb-chip.faible{ background:#FCEFDF; color:#8A4B12; } .eb-chip.elevee{ background:#E2F3EA; color:#1F6B47; }
 .eb-done{ opacity:.55; }
-.eb-qhead{ display:grid; grid-template-columns:2.9rem 64px minmax(0,1.6fr) minmax(0,1fr) minmax(0,1fr) auto; gap:.9rem;
+.eb-qhead{ display:grid; grid-template-columns:2.6rem 64px minmax(0,1.5fr) minmax(0,1fr) minmax(120px,1fr); gap:.9rem;
   font-size:.72rem; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); font-weight:600; padding:0 1rem .2rem; }
 
 /* Barre latérale */
@@ -183,7 +188,8 @@ div[data-baseweb="select"]>div, [data-testid="stTextInput"] input{ border-radius
   .block-container{ padding-left:1rem; padding-right:1rem; }
   .eb-qhead{ display:none; }
   .eb-q, .eb-qhead{ grid-template-columns:1.6rem 56px minmax(0,1fr); }
-  .eb-q .st, .eb-q .pm, .eb-qhead .st, .eb-qhead .pm{ display:none; }
+  .eb-q .st, .eb-qhead .st, .eb-qhead .pm{ display:none; }
+  .eb-q .pm{ grid-column:2 / -1; }
   .eb-big{ font-size:2.6rem; }
   .eb-mx{ grid-template-columns:auto 1fr 1fr; } .eb-mx .tot{ display:none; }
 }
@@ -238,10 +244,9 @@ def legend():
     lines = ("<div class='eb-leg-i'><svg width='34' height='12'><path d='M2 6h30' stroke='#8E1D4A' stroke-width='3' "
              "stroke-linecap='round'/></svg><span><b>Trait plein</b> : contour de la lésion repérée</span></div>"
              "<div class='eb-leg-i'><svg width='34' height='12'><path d='M2 6h30' stroke='#F472B6' stroke-width='2.5' "
-             "stroke-dasharray='6 4' stroke-linecap='round'/></svg><span><b>Pointillés</b> : endroit où l'IA a regardé, "
-             "à vérifier</span></div>")
-    st.markdown(f"<div class='eb-legend'><div class='eb-label' style='margin-bottom:.45rem'>Légende</div>"
-                f"<div class='eb-leg'>{items}</div><div class='eb-leg eb-leg2'>{lines}</div></div>", unsafe_allow_html=True)
+             "stroke-dasharray='6 4' stroke-linecap='round'/></svg><span><b>Pointillés</b> : zone qui a beaucoup pesé "
+             "dans le calcul de l'IA, à vérifier</span></div>")
+    st.markdown(f"<div class='eb-leg'>{items}</div><div class='eb-leg eb-leg2'>{lines}</div>", unsafe_allow_html=True)
 
 
 def confidence_level(conf: float, min_conf: float) -> tuple[str, str]:
@@ -277,32 +282,57 @@ au-delà de <b style='color:var(--wine)'>{settings.t_red:.0%}</b> (seuil priorit
 CLASS_HELP = {"normale": "aucune lésion visible", "bénigne": "lésion non cancéreuse", "maligne": "lésion évocatrice de cancer"}
 
 
-def probs_card(res, settings):
+def probs_card(res):
     rows = "".join(
         f"<div class='eb-prob'><div class='eb-row'><span><span style='color:{CLASS_COLORS[c] if c == 'maligne' else INK}'>{c.capitalize()}</span>"
         f" <span style='color:var(--muted);font-size:.82rem'>· {CLASS_HELP[c]}</span></span>"
         f"<b>{pct(p)}</b></div><div class='eb-track'><div style='width:{p * 100:.1f}%;background:{CLASS_COLORS[c]}'></div></div></div>"
         for c, p in zip(CLASSES, res.probs))
+    st.markdown(f"""<div class='eb-card'>
+<div class='eb-label'>Ce que le modèle voit dans l'image</div>{rows}
+<div class='eb-guide'>{icon('info', 16, WINE)}<div><b>Comment lire ces pourcentages ?</b>
+Les trois chiffres se partagent 100 %. Ils disent à quoi l'image ressemble le plus pour le modèle.
+Par exemple, « maligne 30 % » veut dire que, lors des tests, sur 100 images ayant ce score,
+environ 30 étaient réellement des cancers. C'est une estimation, pas une certitude.</div></div></div>""", unsafe_allow_html=True)
+
+
+DOUBT_CAUSES = [
+    "l'image ne ressemble pas à celles de l'apprentissage : autre appareil, autres réglages, "
+    "ou autre type d'examen (une mammographie par exemple) ;",
+    "la qualité de l'image : flou, image très sombre ou très claire, texte ou mesures incrustés ;",
+    "une lésion d'aspect intermédiaire, entre bénin et malin ;",
+    "plusieurs lésions, ou une lésion coupée par le bord de l'image.",
+]
+
+
+def certainty_card(res, settings):
     label, key = confidence_level(res.confidence, settings.min_confidence)
     colors = {"faible": "#D9822B", "moyenne": "#8C6BB1", "elevee": "#2F8F62"}
     seg = "".join(f"<span class='{'on' if k == key else ''}' style='--c:{colors[k]}'>{n}</span>"
                   for n, k in (("Faible", "faible"), ("Moyenne", "moyenne"), ("Élevée", "elevee")))
-    note = {"faible": "Le modèle hésite entre plusieurs réponses. Par prudence, l'examen passe en orange.",
-            "moyenne": "Une réponse se dégage, sans être nette.",
-            "elevee": "Une réponse se détache nettement des deux autres."}[key]
+    order = sorted(zip(CLASSES, res.probs), key=lambda t: -t[1])
+    (a, pa), (b, pb) = order[0], order[1]
+    why = {
+        "faible": f"Les pourcentages sont proches : le modèle hésite surtout entre « {a} » ({pct(pa)}) et « {b} » ({pct(pb)}). "
+                  "L'image ne ressemble clairement à aucun des cas qu'il a appris. Par prudence, l'examen passe en orange.",
+        "moyenne": f"« {a.capitalize()} » l'emporte ({pct(pa)}), mais « {b} » reste possible ({pct(pb)}).",
+        "elevee": f"« {a.capitalize()} » ({pct(pa)}) se détache nettement des deux autres réponses.",
+    }[key]
+    causes = ""
+    if key != "elevee":
+        found = "".join(f"<li><b>Détecté sur cette image :</b> {html.escape(w)}</li>" for w in res.warnings)
+        causes = (f"<div class='eb-guide'>{icon('info', 16, WINE)}<div><b>Ce qui fait souvent douter le modèle</b>"
+                  "Le modèle ne peut pas dire lui-même pourquoi il doute. Les causes les plus fréquentes sont :"
+                  f"<ul style='margin:.3rem 0 0;padding-left:1.1rem'>{found}{''.join(f'<li>{c}</li>' for c in DOUBT_CAUSES)}</ul></div></div>")
+    else:
+        causes = ("<div style='color:var(--muted);font-size:.84rem;margin-top:.6rem'>Attention : être sûr de soi ne veut pas dire "
+                  "avoir raison. Le modèle peut se tromper avec assurance, surtout sur une image différente de celles qu'il a apprises.</div>")
     st.markdown(f"""<div class='eb-card'>
-<div class='eb-label'>Ce que le modèle voit dans l'image</div>{rows}
-<div class='eb-guide'>{icon('info', 16, ui_wine())}<div><b>Comment lire ces pourcentages ?</b>
-Les trois chiffres se partagent 100 %. Ils disent à quoi l'image ressemble le plus pour le modèle.
-Par exemple, « maligne 30 % » veut dire que, lors des tests, sur 100 images ayant ce score,
-environ 30 étaient réellement des cancers. C'est une estimation, pas une certitude.</div></div>
-<div class='eb-row' style='margin-top:1rem'><b style='font-weight:600'>Le modèle est-il sûr de lui ?</b>
+<div class='eb-row'><span class='eb-label'>Le modèle est-il sûr de lui ?</span>
 <span class='eb-mono' style='color:var(--wine);font-size:.85rem'>{res.confidence * 100:.0f}/100</span></div>
-<div class='eb-seg'>{seg}</div><div style='color:var(--muted);font-size:.86rem'>{note}</div></div>""", unsafe_allow_html=True)
-
-
-def ui_wine() -> str:
-    return WINE
+<div class='eb-seg'>{seg}</div><div style='font-size:.9rem;color:var(--ink);line-height:1.5'>{why}</div>{causes}
+<div style='color:var(--muted);font-size:.8rem;margin-top:.6rem'>Calcul du score : il mesure l'écart entre les trois pourcentages.
+100 = une seule réponse à 100 % ; 0 = trois réponses à égalité (33 % chacune).</div></div>""", unsafe_allow_html=True)
 
 
 def stat(label: str, value: str, ci: list | None, desc: str, tag: str = "") -> str:

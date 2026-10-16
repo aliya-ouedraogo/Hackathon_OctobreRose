@@ -18,7 +18,7 @@ Aide à la **priorisation** des échographies mammaires (jeu public BUSI) — pr
 | F9 | Fiche PDF | `echobreast/report.py` |
 | F10 | Cas de démo (dont un cas d'erreur) | générés par `scripts/evaluate.py` |
 | F11–F15 | Octobre Rose, ressources, consultation, Fiabilité et limites | `app/app.py` |
-| + | Visionneuse : zoom/déplacement, zones numérotées, vue globale, loupe, Netteté, Comparer | `app/viewer.py` |
+| + | Visionneuse : zoom/déplacement, zones numérotées, vue globale, loupe, Netteté, Avant / après IA | `app/viewer.py` |
 
 Règle de couleur : **rouge** si p(maligne) ≥ `t_red` ; **orange** si p(maligne) ≥ `t_orange` *ou* confiance faible ;
 **vert** sinon. `t_orange` est fixé sur la validation pour atteindre ≥ 95 % de sensibilité sur les malins.
@@ -26,12 +26,12 @@ Règle de couleur : **rouge** si p(maligne) ≥ `t_red` ; **orange** si p(malign
 ## Visionneuse et zones à inspecter
 
 - **Zone suspecte** (trait plein lumineux, couleur du niveau) : contour prédit par le U-Net, lissé à pleine résolution.
-- **Où l'IA a regardé** (pointillés roses) : endroits qui ont le plus influencé le résultat (Grad-CAM), hors du
+- **Zones qui ont pesé** (pointillés roses) : endroits qui ont le plus fait monter le risque estimé (Grad-CAM), hors du
   contour. À vérifier visuellement ; ce n'est pas une lésion confirmée.
 - Étiquettes cliquables sur l'image, puces de zones, ‹ › ou flèches du clavier : zoom animé sur la zone.
   Molette / pincement : zoom ; glisser : déplacement ; **vue globale** quand on zoome ; **loupe** qui suit le curseur (touche L).
 - **Netteté** : réduction du grain de l'échographie (speckle, filtre non local), contraste local doux et agrandissement
-  Lanczos. **Comparer** : curseur avant/après entre l'image originale et la vue Netteté.
+  Lanczos. **Avant / après IA** : curseur entre l'image brute et la même image avec les tracés de l'IA.
   Ces vues sont signalées « Amélioration visuelle uniquement — l'analyse utilise l'image originale ».
   Pas de super-résolution par IA : elle inventerait des détails, ce qui est dangereux en imagerie médicale.
 - **File de priorité** : filtres avec compteurs, recherche, aperçu rapide, statut « relu » (gardé pendant la session),
@@ -44,7 +44,7 @@ echobreast/   code partagé (prétraitement, modèles, règle de couleur, zones,
 scripts/      préparation des données, entraînement, évaluation
 app/app.py    pages : Analyser, File de priorité, Fiabilité & limites (+ Octobre Rose)
 app/ui.py     design system : couleurs, badges, icônes, jauge à seuils, cartes
-app/viewer.py visionneuse (zoom, zones, loupe, Netteté, Comparer)
+app/viewer.py visionneuse (zoom, zones, loupe, Netteté, avant / après IA)
 app/static/   polices embarquées (Newsreader, Inter, IBM Plex Mono), ruban, illustration
 models/       classifier.pt, segmenter.pt, settings.json, metrics.json
 docs/PITCH.md script minuté du pitch de 5 min
