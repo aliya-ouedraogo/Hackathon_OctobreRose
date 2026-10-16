@@ -123,7 +123,7 @@ def build_pdf(annotated: Image.Image, result, model_version: str, case_name: str
 
 
 def build_queue_pdf(rows: list[dict], model_version: str) -> bytes:
-    """Récapitulatif de la file de priorité : rang, examen, niveau, risque estimé, relu."""
+    """Récapitulatif de la vue d'ensemble : rang, examen, niveau, probabilité de malignité, relu."""
     pdf = FPDF(format="A4")
     pdf.set_auto_page_break(True, 18)
     pdf.add_page()
@@ -132,7 +132,7 @@ def build_queue_pdf(rows: list[dict], model_version: str) -> bytes:
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Helvetica", "B", 17)
     pdf.set_xy(12, 6)
-    pdf.cell(0, 10, _latin1("EchoBreast - File de priorité"))
+    pdf.cell(0, 10, _latin1("EchoBreast - Vue d'ensemble des examens"))
     pdf.set_text_color(40, 40, 40)
     pdf.set_xy(12, 28)
     pdf.set_font("Helvetica", "", 10)
@@ -142,7 +142,7 @@ def build_queue_pdf(rows: list[dict], model_version: str) -> bytes:
     widths = [14, 84, 40, 32, 16]
     pdf.set_font("Helvetica", "B", 10)
     pdf.set_fill_color(244, 234, 245)
-    for w, h in zip(widths, ["Rang", "Examen", "Niveau", "Risque estimé", "Relu"]):
+    for w, h in zip(widths, ["Rang", "Examen", "Niveau", "Prob. malignité", "Relu"]):
         pdf.cell(w, 8, _latin1(h), border=0, fill=True)
     pdf.ln(8)
     pdf.set_font("Helvetica", "", 10)

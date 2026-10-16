@@ -98,8 +98,8 @@ class Settings:
     """Réglages fixés sur le jeu de VALIDATION par scripts/evaluate.py."""
 
     temperature: float = 1.0
-    t_orange: float = 0.10   # seuil de vigilance : p(maligne) au-delà de laquelle on relit (sensibilité ≥ 95 %)
-    t_red: float = 0.50      # p(maligne) au-delà de laquelle c'est prioritaire
+    t_orange: float = 0.10   # seuil de relecture : p(maligne) au-delà de laquelle on relit (sensibilité ≥ 95 %)
+    t_red: float = 0.50      # seuil d'alerte forte
     min_confidence: float = 0.35
     cls_arch: str = "efficientnet_b0"
     seg_encoder: str = "resnet34"
@@ -120,18 +120,18 @@ class Settings:
 
 
 APP_NAME = "EchoBreast"
-APP_TAGLINE = "Aide à la priorisation des échographies mammaires"
+APP_TAGLINE = "Aide à l'analyse des échographies mammaires"
 
 # Couleur = toujours doublée d'une icône et d'un libellé (accessibilité).
 LEVELS = {
-    "rouge": {"rank": 0, "icon": "octagon-alert", "label": "Prioritaire", "zone": "Zone suspecte", "color": "#C8264E",
-              "soft": "#FCE7EC", "short": "Prioritaire",
-              "text": "Le modèle trouve cette image très évocatrice d'un cancer : à relire en premier."},
-    "orange": {"rank": 1, "icon": "triangle-alert", "label": "À relire", "zone": "Zone à vérifier", "color": "#D9822B",
-               "soft": "#FCEFDF", "short": "À relire",
-               "text": "Résultat incertain ou à surveiller : à relire rapidement."},
-    "vert": {"rank": 2, "icon": "circle-check", "label": "Risque faible", "zone": "Lésion d'aspect bénin", "color": "#2F8F62",
-             "soft": "#E2F3EA", "short": "Risque faible",
+    "rouge": {"rank": 0, "icon": "octagon-alert", "label": "Alerte forte", "zone": "Zone suspecte", "color": "#C8264E",
+              "soft": "#FCE7EC", "short": "Alerte forte",
+              "text": "Image très évocatrice d'une lésion maligne pour le modèle : relecture approfondie suggérée, prélèvement à discuter."},
+    "orange": {"rank": 1, "icon": "triangle-alert", "label": "À examiner de près", "zone": "Zone à vérifier", "color": "#D9822B",
+               "soft": "#FCEFDF", "short": "À examiner",
+               "text": "Résultat incertain ou à surveiller : relecture approfondie suggérée."},
+    "vert": {"rank": 2, "icon": "circle-check", "label": "Peu de signes", "zone": "Lésion d'aspect bénin", "color": "#2F8F62",
+             "soft": "#E2F3EA", "short": "Peu de signes",
              "text": "Peu de signes inquiétants pour le modèle. Cela ne prouve pas l'absence de maladie."},
 }
 
@@ -152,10 +152,10 @@ def risk_level(probs: np.ndarray, s: Settings) -> tuple[str, list[str]]:
     conf = confidence(probs)
     if p_mal >= s.t_red:
         return "rouge", [f"Le modèle estime à {fmt_pct(p_mal)} la probabilité d'une lésion maligne. "
-                         f"C'est au-dessus de {s.t_red:.0%}, le niveau à partir duquel l'examen passe en priorité."]
+                         f"C'est au-dessus de {s.t_red:.0%}, le seuil d'alerte forte."]
     if p_mal >= s.t_orange:
         reasons.append(f"Le modèle estime à {fmt_pct(p_mal)} la probabilité d'une lésion maligne. C'est au-dessus de "
-                       f"{s.t_orange:.0%}, le seuil de vigilance choisi pour ne laisser passer presque aucun cancer.")
+                       f"{s.t_orange:.0%}, le seuil de relecture, choisi bas pour ne laisser passer presque aucune image maligne.")
     if conf < s.min_confidence:
         (i, pa), (j, pb) = sorted(enumerate(probs), key=lambda t: -t[1])[:2]
         reasons.append(f"Le modèle hésite entre « {CLASSES[i]} » ({fmt_pct(pa)}) et « {CLASSES[j]} » ({fmt_pct(pb)}) : "
@@ -163,7 +163,7 @@ def risk_level(probs: np.ndarray, s: Settings) -> tuple[str, list[str]]:
     if reasons:
         return "orange", reasons
     return "vert", [f"Le modèle estime à {fmt_pct(p_mal)} la probabilité d'une lésion maligne, "
-                    f"en dessous du seuil de vigilance ({s.t_orange:.0%})."
+                    f"en dessous du seuil de relecture ({s.t_orange:.0%})."
                     + (" La lésion repérée a plutôt l'aspect d'une lésion bénigne (non cancéreuse) pour le modèle."
                        if int(probs.argmax()) == 1 else "")]
 

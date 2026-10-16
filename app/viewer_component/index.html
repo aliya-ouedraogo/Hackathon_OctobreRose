@@ -125,9 +125,9 @@ html,body{margin:0;font-family:'Inter',system-ui,sans-serif;color:var(--ink);bac
     <div class="tb" role="group" aria-label="Annotation">
       <button class="b" id="tDraw" aria-pressed="false" title="Entourer une zone à la main"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span class="tx">Annoter</span></button>
       <span id="picks" class="hidden" style="display:flex;gap:4px;padding:0 4px">
-        <button class="pick" data-lv="rouge" aria-pressed="false">Prioritaire</button>
-        <button class="pick" data-lv="orange" aria-pressed="true">À relire</button>
-        <button class="pick" data-lv="vert" aria-pressed="false">Risque faible</button>
+        <button class="pick" data-lv="rouge" aria-pressed="false">Alerte forte</button>
+        <button class="pick" data-lv="orange" aria-pressed="true">À examiner de près</button>
+        <button class="pick" data-lv="vert" aria-pressed="false">Peu de signes</button>
       </span>
     </div>
   </div>
@@ -155,7 +155,7 @@ html,body{margin:0;font-family:'Inter',system-ui,sans-serif;color:var(--ink);bac
 function send(type, data){ window.parent.postMessage(Object.assign({isStreamlitMessage:true, type}, data), '*'); }
 function setHeight(){ send('streamlit:setFrameHeight', {height: document.getElementById('wrap').scrollHeight + 4}); }
 
-const LV={rouge:{c:'#C8264E',l:'Prioritaire'}, orange:{c:'#D9822B',l:'À relire'}, vert:{c:'#2F8F62',l:'Risque faible'}};
+const LV={rouge:{c:'#C8264E',l:'Alerte forte'}, orange:{c:'#D9822B',l:'À examiner de près'}, vert:{c:'#2F8F62',l:'Peu de signes'}};
 let W=1, H=1, ZONES=[], LVL='#8E1D4A', SHARP='', HEAT='', LES='Zone suspecte', LVK='orange', IMGKEY=null;
 let ANN=[], SAVED=[], pickLv='orange', drawing=null;
 const $=id=>document.getElementById(id), stage=$('stage'), view=$('view'), NS='http://www.w3.org/2000/svg';
@@ -201,7 +201,7 @@ function caption(){
   const z=ZONES[cur];
   c.innerHTML=z.kind==='lesion'
    ?`<b>Zone ${cur+1} : ${LVK==='vert'?'lésion repérée, d\'aspect plutôt bénin pour l\'IA':LVK==='rouge'?'lésion repérée, jugée suspecte par l\'IA':'lésion repérée, à vérifier'}.</b> Elle occupe ${z.area_pct.toFixed(1).replace('.',',')} % de l'image. Sa taille réelle en mm ne peut pas être mesurée.`
-   :`<b>Zone ${cur+1} : zone qui a beaucoup pesé dans le calcul</b>, en dehors de la lésion repérée. L'IA regarde toute l'image, mais ces endroits ont le plus fait monter son estimation du risque. S'ils tombent sur du tissu mammaire suspect, c'est cohérent ; s'ils tombent hors du sein (fond noir, bord, texte, mesures), le résultat est peu crédible. Ce n'est pas une lésion confirmée.`;
+   :`<b>Zone ${cur+1} : zone qui a beaucoup pesé dans le calcul</b>, en dehors de la lésion repérée. L'IA regarde toute l'image, mais ces endroits ont le plus fait monter son estimation de la probabilité de malignité. S'ils tombent sur du tissu mammaire suspect, c'est cohérent ; s'ils tombent hors du sein (fond noir, bord, texte, mesures), le résultat est peu crédible. Ce n'est pas une lésion confirmée.`;
 }
 function renderChips(){
   const box=$('chips'); box.innerHTML='';

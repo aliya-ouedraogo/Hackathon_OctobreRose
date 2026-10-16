@@ -103,21 +103,22 @@ def meta(entry: dict, demo: bool) -> str:
 @st.dialog("Comment lire un résultat", width="large")
 def reading_guide(settings):
     st.markdown(f"""
-#### 1. La couleur : dans quel ordre relire
+#### 1. La couleur : le niveau d'alerte
 | | Signification | Que faire |
 |---|---|---|
-| **Prioritaire** (rouge) | Le modèle trouve l'image très évocatrice d'un cancer. | Relire en premier. |
-| **À relire** (orange) | Résultat incertain, ou risque au-dessus du seuil de vigilance. | Relire rapidement. |
-| **Risque faible** (vert) | Peu de signes inquiétants pour le modèle. | Relire normalement. Ce n'est pas un « normal » garanti. |
+| **Alerte forte** (rouge) | Le modèle trouve l'image très évocatrice d'une lésion maligne. | Relecture approfondie, prélèvement à discuter. |
+| **À examiner de près** (orange) | Résultat incertain, ou probabilité au-dessus du seuil de relecture. | Relecture approfondie. |
+| **Peu de signes** (vert) | Peu de signes inquiétants pour le modèle. | Lecture habituelle. Ce n'est pas un « normal » garanti. |
 
-#### 2. Le pourcentage : le risque estimé de cancer
-C'est l'estimation, par le modèle, du risque que la lésion soit un cancer. Avec **30 %**, cela veut dire que lors des tests,
+#### 2. Le pourcentage : la probabilité de malignité estimée sur l'image
+Il indique à quel point l'image ressemble aux images de lésions malignes apprises par le modèle, comme la probabilité de malignité du BI-RADS.
+Il porte sur l'image, pas sur la patiente : seul un prélèvement confirme ou écarte un cancer. Avec **30 %**, cela veut dire que lors des tests,
 sur 100 images ayant ce score, environ 30 étaient réellement des cancers. Ce n'est **pas** un diagnostic.
 
 #### 3. Les deux seuils
-- **Seuil de vigilance ({settings.t_orange:.0%})** : au-dessus, l'examen passe en orange. Il est volontairement bas pour ne laisser
+- **Seuil de relecture ({settings.t_orange:.0%})** : au-dessus, l'image passe en orange. Il est volontairement bas pour ne laisser
   passer presque aucun cancer, quitte à créer des fausses alertes.
-- **Seuil prioritaire ({settings.t_red:.0%})** : au-dessus, l'examen passe en rouge.
+- **Seuil d'alerte forte ({settings.t_red:.0%})** : au-dessus, l'image passe en rouge.
 - Si le modèle **hésite** (par exemple « bénigne 40 % » contre « maligne 35 % »), l'examen passe en orange par prudence,
   même avec un faible pourcentage. Causes fréquentes : image différente de celles de l'apprentissage (autre appareil,
   mammographie…), mauvaise qualité, lésion d'aspect intermédiaire, lésion coupée par le bord de l'image.
@@ -127,7 +128,7 @@ sur 100 images ayant ce score, environ 30 étaient réellement des cancers. Ce n
   « Zone suspecte » en rouge, « Zone à vérifier » en orange, « Lésion d'aspect bénin » en vert.
   Un contour en vert ne signale donc pas un danger : le modèle a vu une lésion qu'il juge plutôt bénigne.
 - **Pointillés roses**, bouton « Zones qui ont pesé » : l'IA regarde **toute** l'image, mais certains endroits comptent
-  plus que d'autres dans son calcul. Ce calque montre ceux qui ont le plus fait monter son estimation du risque de cancer.
+  plus que d'autres dans son calcul. Ce calque montre ceux qui ont le plus fait monter son estimation de la probabilité de malignité.
   On n'affiche que les plus marqués, d'où des zones précises plutôt que toute l'image.
   **À quoi ça sert ?** À contrôler l'IA. Si ces zones tombent sur du tissu mammaire ou la lésion, son raisonnement est cohérent.
   Si elles tombent **hors du sein** (fond noir, bord, texte, mesures incrustées), le résultat est peu crédible : l'image est
@@ -135,7 +136,7 @@ sur 100 images ayant ce score, environ 30 étaient réellement des cancers. Ce n
 
 #### 5. Vos propres annotations
 Une zone vous semble suspecte et l'IA ne l'a pas entourée ? Cliquez sur **Annoter**, choisissez la couleur qui vous semble
-adaptée (Prioritaire, À relire, Risque faible), puis entourez la zone sur l'image. Vos tracés sont **bordés de blanc** et
+adaptée (Alerte forte, À examiner de près, Peu de signes), puis entourez la zone sur l'image. Vos tracés sont **bordés de blanc** et
 portent l'étiquette **« Soignant »** ; ceux de l'IA portent l'étiquette **« IA »**. Rien n'est gardé tant que vous n'avez pas
 cliqué sur **Enregistrer** ; « Annuler les modifications » revient à la dernière version enregistrée. Les zones enregistrées
 apparaissent dans la fiche PDF, à côté de celles de l'IA. Elles sont gardées le temps de la session, jamais envoyées ailleurs.
@@ -161,7 +162,7 @@ DECISION_ITEMS = {"relu": "Relecture effectuée", "complement": "Examen complém
 def decision_card(key: str):
     """Cases et commentaire facultatifs du professionnel, reportés tels quels dans la fiche PDF.
     Gardés en mémoire de session seulement. « Relecture effectuée » est la même information que
-    « Marquer comme relu » dans la file de priorité."""
+    « Marquer comme relu » dans la vue d'ensemble."""
     store = st.session_state.setdefault("decisions", {}).setdefault(key, {})
     reviewed: set = st.session_state.setdefault("reviewed", set())
     store["relu"] = key in reviewed
@@ -206,7 +207,7 @@ def page_analyse():
         if opened:
             name, data = opened["name"], opened["data"]
             truth = next((c for c in cases if c["file"] == name), None)
-            st.caption(f"Ouvert depuis la file de priorité : **{name}**")
+            st.caption(f"Ouvert depuis la vue d'ensemble : **{name}**")
         elif src == "Cas de démo" and cases:
             pick = st.selectbox("Cas de démonstration", labels, key="demo_pick", label_visibility="collapsed",
                                 format_func=lambda f: f"Cas {labels.index(f) + 1:02d} · {f}")
@@ -284,15 +285,15 @@ def page_analyse():
 
 
 # --------------------------------------------------------------------------
-# Page : File de priorité
+# Page : Vue d'ensemble
 # --------------------------------------------------------------------------
-FILTERS = {"Tous": None, "Prioritaire": "rouge", "À relire": "orange", "Risque faible": "vert", "Relus": "relu"}
+FILTERS = {"Tous": None, "Alerte forte": "rouge", "À examiner de près": "orange", "Peu de signes": "vert", "Relus": "relu"}
 
 
 def page_priorite():
-    top("File de priorité")
-    ui.header("Tri de la file", "File de priorité",
-              "Examens classés du plus au moins urgent à relire, selon le niveau puis la probabilité de malignité.")
+    top("Vue d'ensemble")
+    ui.header("Tous les examens", "Vue d'ensemble",
+              "Chaque image mérite la même attention. Celles qui demandent une relecture approfondie apparaissent en tête, selon le niveau d'alerte puis la probabilité de malignité.")
     if need_models():
         return
     an = get_analyzer()
@@ -329,9 +330,9 @@ def page_priorite():
     with c:
         from echobreast.report import build_queue_pdf
 
-        st.download_button("Exporter la file (PDF)", build_queue_pdf(
+        st.download_button("Exporter la liste (PDF)", build_queue_pdf(
             [{"name": r["name"], "level": r["res"].level, "p": r["res"].p_malignant, "relu": r["relu"]} for r in rows], an.settings.model_version),
-            file_name="echobreast_file_priorite.pdf", mime="application/pdf", icon=":material/ios_share:",
+            file_name="echobreast_vue_ensemble.pdf", mime="application/pdf", icon=":material/ios_share:",
             use_container_width=True)
 
     counts = {k: (len(rows) if v is None else sum(r["relu"] for r in rows) if v == "relu"
@@ -351,7 +352,7 @@ def page_priorite():
     left, right = st.columns([1.75, 1], gap="medium")
     with left:
         st.markdown("<div class='eb-qhead'><span>Rang</span><span>Coupe</span>"
-                    "<span>Examen · niveau · risque estimé</span></div>", unsafe_allow_html=True)
+                    "<span>Examen · niveau · probabilité de malignité</span></div>", unsafe_allow_html=True)
         if not shown:
             st.caption("Aucun examen pour ce filtre.")
         for r in shown:
@@ -372,7 +373,7 @@ def page_priorite():
                     st.rerun()
         avg = sum(r["res"].p_malignant for r in rows) / len(rows)
         st.markdown(f"<div style='color:var(--muted);font-size:.85rem;margin-top:.4rem'>Affichage de <b>{len(shown)}</b> sur "
-                    f"{len(rows)} examens · <span class='eb-mono'>risque moyen : {avg:.0%}</span></div>",
+                    f"{len(rows)} examens · <span class='eb-mono'>probabilité moyenne : {avg:.0%}</span></div>",
                     unsafe_allow_html=True)
 
     with right:
@@ -482,7 +483,7 @@ def page_limites():
                     tp, fn, fp, tn = mx["vp"], mx["fn"], mx["fp"], mx["vn"]
                     P, N = tp + fn, fp + tn
                     st.markdown(f"""<div class='eb-row' style='margin-bottom:.5rem'><b style='font-weight:600'>Ce que l'outil a signalé</b>
-<span style='font-size:.8rem;color:var(--muted)'>au seuil de vigilance ({m['seuils']['t_orange']:.0%})</span></div>
+<span style='font-size:.8rem;color:var(--muted)'>au seuil de relecture ({m['seuils']['t_orange']:.0%})</span></div>
 <div class='eb-mx'><span class='h'>Réalité \\ Couleur</span><span class='h' style='color:var(--wine)'>Orange ou rouge</span><span class='h'>Vert</span><span class='h tot'>Total</span>
 <span>Cancer</span><span class='c' style='background:#8E1D4A;color:#fff'>{tp}<small>bien signalés</small></span>
 <span class='c' style='background:#F7DDE6;color:#C8264E'>{fn}<small>manqués</small></span><span class='tot eb-mono'>{P}</span>
@@ -499,7 +500,7 @@ Les fausses alertes coûtent une relecture de plus, mais ne font pas rater de ca
                             "</div>",
                             unsafe_allow_html=True)
                 diag = alt.Chart(pd.DataFrame({"x": [0, 1], "y": [0, 1]})).mark_line(strokeDash=[4, 4], color="#CDB7C6").encode(
-                    x=alt.X("x", title="Risque annoncé par l'IA", scale=alt.Scale(domain=[0, 1]), axis=alt.Axis(format="%")),
+                    x=alt.X("x", title="Probabilité annoncée par l'IA", scale=alt.Scale(domain=[0, 1]), axis=alt.Axis(format="%")),
                     y=alt.Y("y", title="Cancers réellement observés", scale=alt.Scale(domain=[0, 1]), axis=alt.Axis(format="%")))
                 if cal.empty:
                     st.markdown(f"<div class='eb-guide' style='margin-top:.6rem'>{ui.icon('info', 16, ui.WINE)}<div>"
@@ -509,14 +510,14 @@ Les fausses alertes coûtent une relecture de plus, mais ne font pas rater de ca
                 else:
                     base = alt.Chart(cal).encode(
                         x="predite", y="observee",
-                        tooltip=[alt.Tooltip("predite", title="Risque annoncé", format=".0%"),
+                        tooltip=[alt.Tooltip("predite", title="Probabilité annoncée", format=".0%"),
                                  alt.Tooltip("observee", title="Cancers observés", format=".0%"),
                                  alt.Tooltip("n", title="Nombre d'images")])
                     chart = diag + base.mark_line(color=ui.WINE, strokeWidth=2.5) + base.mark_circle(color=ui.WINE, size=70)
                     st.altair_chart(chart.properties(height=260).configure_view(strokeWidth=0)
                                     .configure_axis(labelColor="#6F6271", titleColor="#6F6271", gridColor="#F1E6EE"),
                                     use_container_width=True)
-                st.caption(f"Si la courbe suit la diagonale, un risque annoncé de 30 % correspond bien à environ 30 cancers sur 100 images. "
+                st.caption(f"Si la courbe suit la diagonale, une probabilité annoncée de 30 % correspond bien à environ 30 cancers sur 100 images. "
                            f"Écart moyen constaté : {m['ece_apres_calibration'] * 100:.0f} points.")
 
     st.write("")
@@ -629,7 +630,7 @@ def page_infos():
         c2.markdown(info_card("Le parcours de soins", "<ol style='margin:0;padding-left:1.1rem;line-height:1.85'>"
             "<li>Examen clinique</li><li><b style='color:#8E1D4A'>Imagerie : échographie, mammographie</b></li>"
             "<li>Prélèvement si l'image est suspecte</li><li>Analyse en laboratoire</li><li>Décision de traitement</li></ol>",
-            "EchoBreast intervient à l'étape de l'imagerie, pour aider à décider quels examens relire en premier."),
+            "EchoBreast intervient à l'étape de l'imagerie, pour aider le professionnel à approfondir son analyse et à décider s'il faut un prélèvement."),
             unsafe_allow_html=True)
     with t2:
         c1, c2 = st.columns(2, gap="large")
@@ -687,7 +688,7 @@ def page_infos():
 # --------------------------------------------------------------------------
 PAGES = {
     "analyse": st.Page(page_analyse, title="Analyser", icon=":material/center_focus_strong:", default=True),
-    "file": st.Page(page_priorite, title="File de priorité", icon=":material/format_list_numbered:", url_path="priorites"),
+    "file": st.Page(page_priorite, title="Vue d'ensemble", icon=":material/format_list_numbered:", url_path="priorites"),
     "limites": st.Page(page_limites, title="Fiabilité & limites", icon=":material/verified_user:", url_path="fiabilite"),
     "rose": st.Page(page_infos, title="Informations santé", icon=":material/volunteer_activism:", url_path="informations"),
 }

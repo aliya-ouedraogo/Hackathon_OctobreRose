@@ -14,7 +14,7 @@ Aide à la **priorisation** des échographies mammaires (jeu public BUSI) — pr
 | F4 | Contour de la zone suspecte (U-Net ResNet34) | `scripts/train_segmentation.py` |
 | F5, F7 | Code couleur prudent + indicateur de confiance | `echobreast/core.py` (`risk_level`) |
 | F6 | Grad-CAM | `echobreast/inference.py` |
-| F8 | Liste de priorité | page « Liste de priorité » |
+| F8 | Vue d'ensemble | page « Vue d'ensemble » |
 | F9 | Fiche PDF | `echobreast/report.py` |
 | F10 | Cas de démo (dont un cas d'erreur) | générés par `scripts/evaluate.py` |
 | F11–F15 | Octobre Rose, ressources, consultation, Fiabilité et limites | `app/app.py` |
@@ -26,7 +26,7 @@ Règle de couleur : **rouge** si p(maligne) ≥ `t_red` ; **orange** si p(malign
 ## Visionneuse et zones à inspecter
 
 - **Zone suspecte** (trait plein lumineux, couleur du niveau) : contour prédit par le U-Net, lissé à pleine résolution.
-- **Zones qui ont pesé** (pointillés roses) : endroits qui ont le plus fait monter le risque estimé (Grad-CAM), hors du
+- **Zones qui ont pesé** (pointillés roses) : endroits qui ont le plus fait monter la probabilité de malignité (Grad-CAM), hors du
   contour. À vérifier visuellement ; ce n'est pas une lésion confirmée.
 - Étiquettes cliquables sur l'image, puces de zones, ‹ › ou flèches du clavier : zoom animé sur la zone.
   Molette / pincement : zoom ; glisser : déplacement ; **vue globale** quand on zoome ; **loupe** qui suit le curseur (touche L).
@@ -34,10 +34,10 @@ Règle de couleur : **rouge** si p(maligne) ≥ `t_red` ; **orange** si p(malign
   Lanczos. **Avant / après IA** : curseur entre l'image brute et la même image avec les tracés de l'IA.
   Ces vues sont signalées « Amélioration visuelle uniquement — l'analyse utilise l'image originale ».
   Pas de super-résolution par IA : elle inventerait des détails, ce qui est dangereux en imagerie médicale.
-- **Annotations du professionnel** : bouton « Annoter », choix du niveau (Prioritaire / À relire / Risque faible), tracé à
+- **Annotations du professionnel** : bouton « Annoter », choix du niveau (Alerte forte / À examiner de près / Peu de signes), tracé à
   la main sur l'image. Tracés bordés de blanc et étiquetés « Soignant » (ceux de l'IA portent « IA »). « Enregistrer » /
   « Annuler les modifications » ; les zones enregistrées figurent dans la fiche PDF. Gardées le temps de la session uniquement.
-- **File de priorité** : filtres avec compteurs, recherche, aperçu rapide, statut « relu » (gardé pendant la session),
+- **Vue d'ensemble** : filtres avec compteurs, recherche, aperçu rapide, statut « relu » (gardé pendant la session),
   export PDF de la file.
 
 ## Arborescence
@@ -45,7 +45,7 @@ Règle de couleur : **rouge** si p(maligne) ≥ `t_red` ; **orange** si p(malign
 ```
 echobreast/   code partagé (prétraitement, modèles, règle de couleur, zones, PDF)
 scripts/      préparation des données, entraînement, évaluation
-app/app.py    pages : Analyser, File de priorité, Fiabilité & limites (+ Octobre Rose)
+app/app.py    pages : Analyser, Vue d'ensemble, Fiabilité & limites (+ Octobre Rose)
 app/ui.py     design system : couleurs, badges, icônes, jauge à seuils, cartes
 app/viewer.py + app/viewer_component/  visionneuse (composant Streamlit : zoom, zones, loupe, Netteté, avant / après IA, annotations)
 app/static/   polices embarquées (Newsreader, Inter, IBM Plex Mono), ruban, illustration

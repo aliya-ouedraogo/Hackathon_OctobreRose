@@ -161,7 +161,7 @@ div[data-baseweb="select"]>div, [data-testid="stTextInput"] input{ border-radius
 .eb-ban li{ list-style:none; display:flex; gap:.55rem; margin:.45rem 0; font-size:.92rem; }
 .eb-ban{ padding:0; margin:.4rem 0 0; }
 
-/* File de priorité */
+/* Vue d'ensemble */
 .eb-q{ display:grid; grid-template-columns:2.4rem 76px minmax(0,1fr); gap:.9rem; align-items:center; }
 .eb-q .info{ min-width:0; }
 .eb-q .line{ display:flex; flex-wrap:wrap; align-items:center; gap:.4rem .8rem; margin-top:.5rem; }
@@ -207,7 +207,7 @@ def inject_css():
 
 def brand():
     st.markdown(f"<div class='eb-brand'><img src='{ribbon_uri()}' alt='Ruban rose'>"
-                f"<div><b>{APP_NAME}</b><span>Aide à la priorisation</span></div></div>", unsafe_allow_html=True)
+                f"<div><b>{APP_NAME}</b><span>Aide à l'analyse</span></div></div>", unsafe_allow_html=True)
 
 
 def topbar(page: str, version: str, synthetic: bool):
@@ -242,8 +242,8 @@ def legend():
     """Légende permanente : signification des couleurs et des contours."""
     items = "".join(
         f"<div class='eb-leg-i'>{badge(k, 'sm')}<span>{t}</span></div>"
-        for k, t in (("rouge", "très évocateur d'un cancer : à relire en premier"),
-                     ("orange", "incertain ou à surveiller : à relire rapidement"),
+        for k, t in (("rouge", "très évocateur d'une lésion maligne : relecture approfondie suggérée"),
+                     ("orange", "incertain ou à surveiller : à examiner de près"),
                      ("vert", "peu de signes inquiétants, ce n'est pas un « normal » garanti")))
     lines = ("<div class='eb-leg-i'><svg width='34' height='12'><path d='M2 6h30' stroke='#8E1D4A' stroke-width='3' "
              "stroke-linecap='round'/></svg><span><b>Trait plein</b> : contour de la lésion repérée</span></div>"
@@ -261,7 +261,7 @@ def triage_card(res, settings):
     p = res.p_malignant
     mk = "".join(f"<div class='mk' style='left:{min(99.5, t * 100):.1f}%'><span>{t:.0%}</span></div>"
                  for t in (settings.t_orange, settings.t_red))
-    headline = {"rouge": "À relire en premier", "orange": "À relire rapidement",
+    headline = {"rouge": "Relecture approfondie suggérée", "orange": "À examiner de près",
                 "vert": "Peu de signes inquiétants"}[res.level]
     crit = []
     for r in res.reasons:
@@ -269,12 +269,13 @@ def triage_card(res, settings):
         crit.append(f"<div class='eb-crit'>{icon(ic[0], 17, ic[1])}<span>{html.escape(r)}</span></div>")
     st.markdown(f"""<div class='eb-card'>
 <div class='eb-row'><span class='eb-label'>Résultat de l'IA</span>{badge(res.level)}</div>
-<div style='margin-top:.7rem' class='eb-big'>{pct(p, '&thinsp;')}<small>risque estimé de cancer</small></div>
-<div class='eb-thr' aria-label='Risque estimé {p:.0%}, seuil de vigilance {settings.t_orange:.0%}, seuil prioritaire {settings.t_red:.0%}'>
+<div style='margin-top:.7rem' class='eb-big'>{pct(p, '&thinsp;')}<small>probabilité de malignité estimée sur l'image</small></div>
+<div style='font-size:.8rem;color:var(--muted);margin-top:.15rem'>Estimée sur l'image seule. Seul un prélèvement confirme ou écarte un cancer.</div>
+<div class='eb-thr' aria-label='Probabilité de malignité {p:.0%}, seuil de relecture {settings.t_orange:.0%}, seuil d alerte forte {settings.t_red:.0%}'>
 <div class='fill' style='width:{p * 100:.1f}%'></div>{mk}</div>
 <div class='eb-scale'><span>0 %</span><span>100 %</span></div>
-<div style='font-size:.84rem;color:var(--muted);margin-top:.3rem;line-height:1.5'>Au-delà de <b style='color:var(--wine)'>{settings.t_orange:.0%}</b> (seuil de vigilance) l'examen passe en orange,
-au-delà de <b style='color:var(--wine)'>{settings.t_red:.0%}</b> (seuil prioritaire) en rouge.</div>
+<div style='font-size:.84rem;color:var(--muted);margin-top:.3rem;line-height:1.5'>Au-delà de <b style='color:var(--wine)'>{settings.t_orange:.0%}</b> (seuil de relecture) l'image passe en orange,
+au-delà de <b style='color:var(--wine)'>{settings.t_red:.0%}</b> (seuil d'alerte forte) en rouge.</div>
 <div class='eb-alert' style='--c:{lv['color']};--soft:{lv['soft']}'>{icon(lv['icon'], 18, lv['color'])}{headline}</div>
 <div class='eb-label' style='margin-top:1.1rem'>Pourquoi cette couleur ?</div>{''.join(crit)}
 </div>""", unsafe_allow_html=True)
