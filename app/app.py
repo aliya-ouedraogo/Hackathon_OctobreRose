@@ -8,6 +8,7 @@ import hashlib
 import html
 import io
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -22,6 +23,23 @@ from echobreast.core import APP_NAME, APP_TAGLINE, LEVELS, MODELS_DIR, priority_
 import ui  # noqa: E402
 
 DEMO_DIR = APP_DIR / "demo"
+
+
+def setting(name: str, default: str = "") -> str:
+    """Réglage de la version en ligne : secrets Streamlit Cloud, sinon variable d'environnement."""
+    try:
+        if name in st.secrets:
+            return str(st.secrets[name]).strip()
+    except Exception:  # pas de fichier secrets.toml en local : normal
+        pass
+    return os.environ.get(name, default).strip()
+
+
+# Version en ligne : EB_DEMO=1 affiche le bandeau de démonstration ; EB_FEEDBACK_URL ajoute le bouton
+# vers le questionnaire ; EB_MODELS_REPO est le dépôt Hugging Face d'où télécharger modèles et cas de démo.
+ONLINE = setting("EB_DEMO") == "1"
+FEEDBACK_URL = setting("EB_FEEDBACK_URL")
+MODELS_REPO = setting("EB_MODELS_REPO")
 STATIC = APP_DIR / "static"
 
 st.set_page_config(page_title=f"{APP_NAME} · {APP_TAGLINE}", page_icon=str(STATIC / "ribbon.png"),
@@ -35,6 +53,12 @@ st.set_page_config(page_title=f"{APP_NAME} · {APP_TAGLINE}", page_icon=str(STAT
 def get_analyzer():
     from echobreast.inference import Analyzer
 
+    if not Analyzer.available() and MODELS_REPO:
+        # En ligne, les modèles ne sont pas dans GitHub : on les récupère une fois au démarrage.
+        from huggingface_hub import snapshot_download
+
+        with st.spinner("Premier démarrage : téléchargement des modèles (environ 1 minute)…"):
+            snapshot_download(MODELS_REPO, local_dir=str(ROOT), allow_patterns=["models/*", "app/demo/*"])
     return Analyzer() if Analyzer.available() else None
 
 
@@ -42,9 +66,25 @@ def _cache() -> dict:
     return st.session_state.setdefault("cache", {})
 
 
+@st.cache_resource
+def _shared_cache() -> dict:
+    """Analyses des cas de démonstration, calculées une fois et partagées entre tous les visiteurs
+    (en ligne, chacun ouvre les mêmes cas : on évite de tout recalculer et stocker par personne)."""
+    return {}
+
+
+def demo_keys() -> set[str]:
+    return {hashlib.sha1(f.read_bytes()).hexdigest() for f in DEMO_DIR.glob("*.png")}
+
+
+def _cache_for(key: str) -> dict:
+    # Une image importée reste dans la session de la personne, et disparaît avec elle.
+    return _shared_cache() if key in demo_keys() else _cache()
+
+
 def analyze_bytes(data: bytes):
     key = hashlib.sha1(data).hexdigest()
-    c = _cache()
+    c = _cache_for(key)
     if key not in c:
         raw = Image.open(io.BytesIO(data))
         raw.load()
@@ -56,7 +96,7 @@ def viewer_assets(key: str):
     """Vues d'affichage (originale, Netteté), carte des zones qui ont pesé, et zones, calculées une seule fois."""
     from echobreast.inference import enhance_for_display, find_zones, heat_rgba
 
-    entry = _cache()[key]
+    entry = _cache_for(key)[key]
     if "zones" not in entry:
         raw, res = entry["raw"], entry["res"]
         heat = get_analyzer().gradcam(raw)
@@ -81,6 +121,15 @@ def top(page: str):
     an = get_analyzer()
     version = an.settings.model_version if an else "absent"
     ui.topbar(page, version, "SYNTH" in version.upper())
+    if ONLINE:
+        b, f = st.columns([4, 1], vertical_alignment="center")
+        b.markdown(f"<div class='eb-demo'>{ui.icon('triangle-alert', 16, '#9A5410')}<span><b>Version de démonstration en ligne.</b> "
+                   "Utilisez les cas de démonstration ou des images anonymisées : n'importez aucune image permettant "
+                   "d'identifier une patiente. Les images sont analysées sans être enregistrées.</span></div>",
+                   unsafe_allow_html=True)
+        if FEEDBACK_URL:
+            f.link_button("Donner mon avis", FEEDBACK_URL, icon=":material/rate_review:", type="primary",
+                          use_container_width=True)
 
 
 def need_models() -> bool:
@@ -178,6 +227,11 @@ def decision_card(key: str):
                     "<div style='color:var(--muted);font-size:.85rem;margin:.25rem 0 .4rem'>Facultatif. Ce que vous "
                     "cochez ou écrivez apparaît dans la fiche PDF. Ce qui reste vide sera à compléter à la main.</div>",
                     unsafe_allow_html=True)
+        st.session_state[f"dec_reference_{key}"] = store.get("reference", "")
+        st.text_input("Référence de l'examen (facultatif)", key=f"dec_reference_{key}", on_change=save,
+                      args=("reference",), max_chars=40, placeholder="N° interne du dossier, jamais le nom",
+                      help="Imprimée sur la fiche PDF pour la rattacher au bon dossier. "
+                           "N'écrivez ni le nom ni la date de naissance de la patiente.")
         for field, label in DECISION_ITEMS.items():
             st.session_state[f"dec_{field}_{key}"] = bool(store.get(field, False))
             st.checkbox(label, key=f"dec_{field}_{key}", on_change=save, args=(field,))
@@ -185,7 +239,31 @@ def decision_card(key: str):
         st.text_area("Commentaire", key=f"dec_comment_{key}", on_change=save, args=("comment",), max_chars=400,
                      height=90, placeholder="Votre commentaire (facultatif)")
     # Renvoie une fonction : la fiche PDF lit la décision au moment du clic, pas au dernier affichage.
-    return lambda: {**{f: bool(store.get(f, False)) for f in DECISION_ITEMS}, "comment": store.get("comment", "").strip()}
+    return lambda: {**{f: bool(store.get(f, False)) for f in DECISION_ITEMS}, "comment": store.get("comment", "").strip(),
+                    "reference": store.get("reference", "").strip()}
+
+
+IMPRESSIONS = ["vert", "orange", "rouge"]
+
+
+def impression_card(key: str, impressions: dict, revealed: set):
+    """Mode « Lire d'abord » : le professionnel note son impression, puis affiche l'analyse de l'IA."""
+    with st.container(border=True, key=f"impression_box_{key[:12]}"):
+        st.markdown("<div class='eb-label'>Lire d'abord sans l'IA</div>"
+                    "<div style='margin:.35rem 0 .2rem;font-size:.95rem'>Regardez l'image seule. "
+                    "Quelle est votre première impression ?</div>"
+                    "<div style='color:var(--muted);font-size:.85rem;margin-bottom:.5rem'>L'analyse de l'IA reste "
+                    "cachée jusqu'à votre choix, pour ne pas influencer votre lecture.</div>", unsafe_allow_html=True)
+        pick = st.radio("Votre impression", IMPRESSIONS, index=None, key=f"imp_{key}",
+                        format_func=lambda k: LEVELS[k]["label"], label_visibility="collapsed")
+        if st.button("Afficher l'analyse de l'IA", icon=":material/visibility:", type="primary",
+                     use_container_width=True, disabled=pick is None, key=f"reveal_{key}"):
+            impressions[key] = pick
+            revealed.add(key)
+            st.rerun()
+        if st.button("Passer sans noter d'impression", key=f"skip_{key}", type="tertiary"):
+            revealed.add(key)
+            st.rerun()
 
 
 def page_analyse():
@@ -193,7 +271,7 @@ def page_analyse():
     h, ctl = st.columns([1.25, 1], vertical_alignment="bottom")
     with h:
         ui.header("Lecture assistée", "Analyser une échographie",
-                  "L'IA indique dans quel ordre relire les examens et montre les zones à regarder. La décision reste au professionnel.")
+                  "L'IA apporte un regard complémentaire et montre les zones à regarder. La décision reste au professionnel.")
     if need_models():
         return
     an = get_analyzer()
@@ -217,11 +295,14 @@ def page_analyse():
             up = st.file_uploader("Échographie (PNG ou JPG)", type=["png", "jpg", "jpeg"], label_visibility="collapsed")
             if up:
                 data, name = up.getvalue(), up.name
+        st.toggle("Lire d'abord sans l'IA", key="blind",
+                  help="Vous lisez l'image seule et notez votre impression avant de voir l'analyse de l'IA, "
+                       "pour ne pas être influencé par elle.")
 
     if data is None:
         st.markdown(f"<div class='eb-card' style='text-align:center;padding:3rem'>{ui.icon('image-up', 40, ui.WINE, 1.5)}"
                     "<h3 style='justify-content:center;margin-top:.8rem'>Déposez une échographie mammaire</h3>"
-                    "<span style='color:var(--muted)'>PNG ou JPG · traitée localement, jamais conservée</span></div>",
+                    f"<span style='color:var(--muted)'>PNG ou JPG · {'analysée sans être enregistrée' if ONLINE else 'traitée localement, jamais conservée'}</span></div>",
                     unsafe_allow_html=True)
         return
     try:
@@ -243,6 +324,9 @@ def page_analyse():
                 reading_guide(an.settings)
         ui.legend()
 
+    revealed: set = st.session_state.setdefault("revealed", set())
+    impressions: dict = st.session_state.setdefault("impressions", {})
+    hidden = st.session_state.get("blind", False) and key not in revealed
     left, right = st.columns([1.7, 1], gap="medium")
     with left:
         with st.spinner("Préparation de la visionneuse…"):
@@ -250,12 +334,21 @@ def page_analyse():
         from viewer import render_viewer
 
         store = st.session_state.setdefault("annotations", {})
-        val = render_viewer(assets["base"], assets["sharp"], assets["heat"], assets["zones"], raw.size,
-                            res.level, img_key=key, saved=store.get(key, []), stage_height=600)
-        if val and val.get("img_key") == key:
+        # Lecture sans l'IA : même visionneuse, sans contour ni carte, avec sa propre clé pour repartir de zéro ensuite.
+        vkey = f"{key}-seule" if hidden else key
+        val = render_viewer(assets["base"], assets["sharp"], None if hidden else assets["heat"],
+                            [] if hidden else assets["zones"], raw.size, res.level, img_key=vkey,
+                            saved=store.get(key, []), stage_height=600)
+        if val and val.get("img_key") == vkey:
             store[key] = val.get("annotations", [])
-        ui.probs_card(res)
+        if not hidden:
+            ui.probs_card(res)
     with right:
+        if hidden:
+            impression_card(key, impressions, revealed)
+            return
+        if key in impressions:
+            ui.impression_compare(impressions[key], res.level)
         ui.triage_card(res, an.settings)
         from echobreast.inference import draw_contour
         from echobreast.report import build_pdf
@@ -273,7 +366,8 @@ def page_analyse():
         # PDF construit au clic : il reprend les cases et le commentaire tels qu'ils sont à ce moment-là.
         st.download_button("Télécharger la fiche PDF",
                            lambda: build_pdf(draw_contour(raw, res.mask, res.level, annotations=anns, labels=True),
-                                             res, version, name, annotations=anns, decision=decision()),
+                                             res, version, decision().get("reference") or name, annotations=anns,
+                                             decision=decision(), impression=impressions.get(key)),
                            file_name=f"echobreast_{Path(name).stem}.pdf", mime="application/pdf", type="primary",
                            icon=":material/download:", use_container_width=True)
         if truth:
@@ -699,7 +793,8 @@ with st.sidebar:
     ui.brand()
     for k in ("analyse", "file", "limites"):
         st.page_link(PAGES[k], use_container_width=True)
-    st.markdown(f"<div class='eb-foot'>{ui.icon('lock', 14)} Traitement local · aucune image conservée</div>",
+    st.markdown(f"<div class='eb-foot'>{ui.icon('lock', 14)} "
+                f"{'Version en ligne · aucune image enregistrée' if ONLINE else 'Traitement local · aucune image conservée'}</div>",
                 unsafe_allow_html=True)
     st.page_link(PAGES["rose"], label="Informations santé", icon=":material/volunteer_activism:",
                  use_container_width=True)

@@ -113,6 +113,15 @@ streamlit run app/app.py
 Déploiement gratuit : Streamlit Community Cloud ou Hugging Face Spaces (SDK Streamlit). Garder la version locale
 et une vidéo de secours pour le jour J.
 
+## 3. Mettre l'application en ligne (Hugging Face Spaces)
+
+```bash
+pip install huggingface_hub
+python deploy/huggingface/publier.py VOTRE_PSEUDO/echobreast --avis https://forms.gle/xxxx
+```
+Lien public, accessible de partout sans compte. En ligne, un bandeau rappelle de n'importer aucune
+image permettant d'identifier une patiente. Étapes détaillées : `docs/HEBERGEMENT.md`.
+
 ## Plan de repli (voir doc de conception §13)
 
 - Contour peu fiable → ne pas livrer `segmenter.pt` : l'app n'affiche alors pas de contour et Grad-CAM sert d'explication.

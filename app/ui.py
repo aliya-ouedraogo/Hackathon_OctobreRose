@@ -111,6 +111,9 @@ div[data-baseweb="select"]>div, [data-testid="stTextInput"] input{ border-radius
 
 /* Légende et guide */
 .st-key-legend_box{ background:#fff; box-shadow:var(--shadow); margin-bottom:.6rem; }
+.eb-demo{ display:flex; gap:.6rem; align-items:flex-start; background:#FCEFDF; border:1px solid #F3D3AE; color:#5C3A10; border-radius:var(--radius); padding:.65rem .9rem; font-size:.86rem; line-height:1.45; }
+.eb-demo svg{ flex:none; margin-top:.15rem; }
+[class*='st-key-impression_box']{ background:#fff; box-shadow:var(--shadow); }
 [class*='st-key-decision_box']{ background:#fff; box-shadow:var(--shadow); margin-top:.8rem; }
 .st-key-guide_btn{ display:flex; justify-content:flex-end; }
 .st-key-guide_btn button{ min-height:38px; padding:.35rem 1rem; }
@@ -254,6 +257,19 @@ def legend():
              "stroke-linecap='round'/><path d='M4 6h26' stroke='#D9822B' stroke-width='2.5' stroke-linecap='round'/></svg>"
              "<span><b>Bordé de blanc, « Soignant »</b> : zone ajoutée par le professionnel</span></div>")
     st.markdown(f"<div class='eb-leg'>{items}</div><div class='eb-leg eb-leg2'>{lines}</div>", unsafe_allow_html=True)
+
+
+def impression_compare(mine: str, ai: str):
+    """Impression du professionnel (lecture sans l'IA) face au niveau de l'IA."""
+    same = mine == ai
+    note = ("Même niveau que l'IA." if same else
+            "Avis différents : prenez le temps de comparer votre lecture et celle de l'IA.")
+    st.markdown(f"<div class='eb-card' style='margin-bottom:.8rem;border-left:4px solid {'#2F8F62' if same else '#D9822B'}'>"
+                f"<div class='eb-label'>Votre impression avant l'IA</div>"
+                f"<div class='eb-row' style='margin-top:.5rem;flex-wrap:wrap;gap:.5rem'><span>Vous : {badge(mine, 'sm')}</span>"
+                f"<span>IA : {badge(ai, 'sm')}</span></div>"
+                f"<div style='color:var(--muted);font-size:.85rem;margin-top:.45rem'>{note}</div></div>",
+                unsafe_allow_html=True)
 
 
 def triage_card(res, settings):

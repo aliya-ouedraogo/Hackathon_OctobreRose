@@ -1,6 +1,7 @@
-.venv/
 env/
+.venv/
 __pycache__/
 data/
 *.pt
 !models/.gitkeep
+.streamlit/secrets.toml

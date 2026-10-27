@@ -374,6 +374,9 @@ function init(a){
   imgBase.src=a.base; $('miniImg').src=a.base; imgSharp.removeAttribute('src'); $('imgHeat').removeAttribute('src');
   ['tAtt','tSharp','tCmp'].forEach(id=>{if(pressed(id)) $(id).click();});
   if(!pressed('tContour')) $('tContour').click();
+  // Lecture sans l'IA (ni zone ni carte) : on masque les outils qui n'auraient rien à montrer.
+  const aiOff=!ZONES.length&&!HEAT;
+  ['tContour','tAtt','tCmp'].forEach(id=>{$(id).style.display=aiOff?'none':'';});
   drawZones(); setVisible('attention',false); layout(); apply(false); renderChips(); caption(); note(); drawAnn(); setHeight();
 }
 window.addEventListener('message',ev=>{
