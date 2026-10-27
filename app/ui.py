@@ -72,10 +72,10 @@ h4{ color:var(--ink); }
   font-weight:600; min-height:40px; padding:.45rem 1rem; border:1px solid var(--line); background:#fff;
   transition:background .15s, border-color .15s; }
 .stButton>button[kind="primary"], .stDownloadButton>button[kind="primary"], [data-testid="stLinkButton"] a[kind="primary"]{
-  background:#F6E7EE; border-color:#E5C6D4; color:var(--wine); box-shadow:none; }
-.stButton>button[kind="primary"] p, .stDownloadButton>button[kind="primary"] p{ color:var(--wine); }
+  background:#A3456B; border-color:#A3456B; color:#fff; box-shadow:0 4px 12px -8px rgba(120,30,70,.6); }
+.stButton>button[kind="primary"] p, .stDownloadButton>button[kind="primary"] p, [data-testid="stLinkButton"] a[kind="primary"] p{ color:#fff; }
 .stButton>button[kind="primary"]:hover, .stDownloadButton>button[kind="primary"]:hover, [data-testid="stLinkButton"] a[kind="primary"]:hover{
-  background:#EFD7E2; border-color:#D9AFC2; color:var(--wine); }
+  background:#8F3A5D; border-color:#8F3A5D; color:#fff; }
 .stButton>button[kind="secondary"]:hover{ background:var(--lav); border-color:var(--lav-2); color:var(--wine); }
 .stButton>button[kind="tertiary"]{ color:var(--wine); font-weight:600; }
 [data-testid="stFileUploaderDropzone"]{ border:1px dashed #D9BFD0; background:#fff; border-radius:var(--radius); }
