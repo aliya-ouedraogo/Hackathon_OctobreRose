@@ -97,17 +97,16 @@ def analyze_bytes(data: bytes):
 
 
 def viewer_assets(key: str):
-    """Vues d'affichage (originale, Netteté), carte des zones qui ont pesé, et zones, calculées une seule fois."""
-    from echobreast.inference import enhance_for_display, find_zones, heat_rgba
+    """Vues d'affichage (originale, Netteté) et contour de la lésion, calculés une seule fois."""
+    from echobreast.inference import enhance_for_display, find_zones
 
     entry = _cache_for(key)[key]
     if "zones" not in entry:
         raw, res = entry["raw"], entry["res"]
-        heat = get_analyzer().gradcam(raw)
-        entry["heat"] = heat_rgba(heat)
+        entry["heat"] = None
         entry["base"] = enhance_for_display(raw, 1024)
         entry["sharp"] = enhance_for_display(raw, 1024, sharp=True)
-        entry["zones"] = find_zones(res.mask, heat if res.level != "vert" else None, (raw.height, raw.width))
+        entry["zones"] = find_zones(res.mask, None, (raw.height, raw.width))
     return entry
 
 
@@ -180,12 +179,7 @@ sur 100 images ayant ce score, environ 30 étaient réellement des cancers. Ce n
 - **Trait plein** (couleur du niveau) : contour de la lésion repérée par le modèle. Son nom suit la couleur :
   « Zone suspecte » en rouge, « Zone à vérifier » en orange, « Lésion d'aspect bénin » en vert.
   Un contour en vert ne signale donc pas un danger : le modèle a vu une lésion qu'il juge plutôt bénigne.
-- **Pointillés roses**, bouton « Zones qui ont pesé » : l'IA regarde **toute** l'image, mais certains endroits comptent
-  plus que d'autres dans son calcul. Ce calque montre ceux qui ont le plus fait monter son estimation de la probabilité de malignité.
-  On n'affiche que les plus marqués, d'où des zones précises plutôt que toute l'image.
-  **À quoi ça sert ?** À contrôler l'IA. Si ces zones tombent sur du tissu mammaire ou la lésion, son raisonnement est cohérent.
-  Si elles tombent **hors du sein** (fond noir, bord, texte, mesures incrustées), le résultat est peu crédible : l'image est
-  sans doute trop différente de celles que l'IA a apprises. Ces zones ne sont pas des lésions confirmées.
+- Le contour est **indicatif** : il peut être imprécis, ou manquer une lésion. Vérifiez toujours l'image entière.
 
 #### 5. Vos propres annotations
 Une zone vous semble suspecte et l'IA ne l'a pas entourée ? Cliquez sur **Annoter**, choisissez la couleur qui vous semble
@@ -196,13 +190,20 @@ apparaissent dans la fiche PDF, à côté de celles de l'IA. Elles sont gardées
 
 #### 6. Avant / après IA, et Netteté
 - **Avant / après IA** : un curseur sépare l'image brute (à gauche, sans aucun tracé) et la même image avec l'analyse de l'IA
-  (à droite, contours et zones). Faites-le glisser pour vérifier ce que l'IA a ajouté.
+  (à droite, avec le contour). Faites-le glisser pour vérifier ce que l'IA a ajouté.
 - **Netteté** : réduit le grain de l'échographie pour mieux voir. Elle sert **uniquement à l'œil** : le modèle analyse
   toujours l'image originale.
 
-#### 7. Ce que l'outil ne fait pas
+#### 7. Les boutons de la visionneuse
+Sur téléphone, seules les icônes s'affichent. Voici ce que fait chacune :
+
+<div class='eb-tools-help'><div class='r'><span class='ic'>−&nbsp;&nbsp;+</span><span><b>Zoom</b><br>Rapprocher ou éloigner l'image (ou pincer avec deux doigts).</span></div><div class='r'><span class='ic'><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg></span><span><b>Ajuster</b><br>Revenir à l'image entière.</span></div><div class='r'><span class='ic'><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></span><span><b>Plein écran</b><br>Afficher l'image sur tout l'écran.</span></div><div class='r'><span class='ic'><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg></span><span><b>Contour</b><br>Afficher ou masquer le contour tracé par l'IA.</span></div><div class='r'><span class='ic'><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4M19 14v4M10 2v2M7 8H3M21 16h-4M11 3H9"/></svg></span><span><b>Netteté</b><br>Réduire le grain pour l'œil. L'IA analyse toujours l'original.</span></div><div class='r'><span class='ic'><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18"/></svg></span><span><b>Avant / après IA</b><br>Comparer l'image brute et l'image avec le contour, grâce à un curseur.</span></div><div class='r'><span class='ic'><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span><span><b>Annoter</b><br>Entourer vous-même une zone, puis Enregistrer : elle figure sur la fiche PDF.</span></div></div>
+
+#### 8. Ce que l'outil ne fait pas
 Il ne pose pas de diagnostic, ne mesure pas la taille en mm et n'a pas été validé sur des patientes du Burkina Faso.
-**La décision appartient toujours au professionnel de santé.**""")
+**La décision appartient toujours au professionnel de santé.**""", unsafe_allow_html=True)
+    if st.button("Fermer le guide", icon=":material/close:", key="guide_close"):
+        st.rerun()
 
 
 # --------------------------------------------------------------------------
@@ -665,7 +666,7 @@ Les fausses alertes coûtent une relecture de plus, mais ne font pas rater de ca
                ("scale", "Biais documentés", "Des études rapportent plus de faux positifs de certains systèmes d'IA en imagerie "
                 "mammaire chez les femmes noires et les patientes plus âgées."),
                ("ruler", "Pas de mesure en mm", "L'échelle de l'image est inconnue : aucune taille réelle n'est calculée."),
-               ("eye", "Zones qui ont pesé", "Elles montrent ce qui a le plus compté dans le calcul de l'IA, pas une lésion confirmée."),
+               ("eye", "Contour indicatif", "Le contour montre la zone repérée par l'IA : il peut être imprécis ou manquer une lésion."),
                ("image-up", "Netteté = affichage", "Réduction du grain et agrandissement pour l'œil humain uniquement ; "
                 "l'analyse porte sur l'image originale."),
                ("info", "Petit jeu déséquilibré", "Seulement 210 images de cancers : les chiffres ont une marge d'incertitude importante.")]

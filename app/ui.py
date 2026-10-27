@@ -136,8 +136,15 @@ div[data-baseweb="select"]>div, [data-testid="stTextInput"] input{ border-radius
 .stButton>button[kind="tertiary"]:hover{ text-decoration:underline; background:transparent; }
 /* Fenêtre du guide : taille raisonnable, défilement interne, fond flouté (clic à côté pour fermer) */
 [data-testid="stDialog"]{ backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px); background:rgba(42,31,44,.28); }
-[data-testid="stDialog"] [role="dialog"]{ max-height:82vh; overflow-y:auto; border-radius:20px; }
+/* Seul le contenu défile : le titre et la croix restent toujours visibles */
+[data-testid="stDialog"] [role="dialog"]{ max-height:82vh; display:flex; flex-direction:column; overflow:hidden; border-radius:16px; }
+[data-testid="stDialog"] [role="dialog"] > div:last-child{ overflow-y:auto; min-height:0; flex:1 1 auto; }
 @media (max-width:640px){ [data-testid="stDialog"] [role="dialog"]{ max-height:88vh; } }
+.eb-tools-help{ display:grid; gap:.5rem; margin:.3rem 0 .6rem; }
+.eb-tools-help .r{ display:flex; gap:.75rem; align-items:flex-start; font-size:.9rem; line-height:1.4; }
+.eb-tools-help .ic{ flex:none; width:38px; height:38px; border-radius:8px; background:#1E1620; color:#fff; display:flex;
+  align-items:center; justify-content:center; font-weight:600; font-size:.95rem; }
+.eb-tools-help .ic svg{ width:16px; height:16px; }
 [class*='st-key-decision_box']{ background:#fff; box-shadow:var(--shadow); margin-top:.8rem; }
 .st-key-guide_btn{ display:flex; justify-content:flex-end; }
 .st-key-guide_btn button{ min-height:38px; padding:.35rem 1rem; }
@@ -274,9 +281,6 @@ def legend():
                      ("vert", "peu de signes inquiétants, ce n'est pas un « normal » garanti")))
     lines = ("<div class='eb-leg-i'><svg width='34' height='12'><path d='M2 6h30' stroke='#8E1D4A' stroke-width='3' "
              "stroke-linecap='round'/></svg><span><b>Trait plein</b> : contour de la lésion repérée</span></div>"
-             "<div class='eb-leg-i'><svg width='34' height='12'><path d='M2 6h30' stroke='#F472B6' stroke-width='2.5' "
-             "stroke-dasharray='6 4' stroke-linecap='round'/></svg><span><b>Pointillés</b> : zone qui a beaucoup pesé "
-             "dans le calcul de l'IA, à vérifier</span></div>"
              "<div class='eb-leg-i'><svg width='34' height='12'><rect width='34' height='12' rx='3' fill='#2A1F2C'/><path d='M4 6h26' stroke='#FFFFFF' stroke-width='6' "
              "stroke-linecap='round'/><path d='M4 6h26' stroke='#D9822B' stroke-width='2.5' stroke-linecap='round'/></svg>"
              "<span><b>Bordé de blanc, « Soignant »</b> : zone ajoutée par le professionnel</span></div>")
@@ -288,7 +292,7 @@ def impression_compare(mine: str, ai: str, n: int = 1, same_n: int = 0):
     same = mine == ai
     note = ("Même niveau que l'IA : vos deux lectures se confirment." if same else
             "Avis différents : c'est le cas où le second regard est le plus utile. Reprenez l'image, "
-            "en regardant la zone entourée et les zones qui ont pesé, avant de décider.")
+            "en regardant de près la zone entourée, avant de décider.")
     bilan = (f"<div class='eb-impr-bilan'><b>Votre visite :</b> {n} image{'s' if n > 1 else ''} lue{'s' if n > 1 else ''} "
              f"d'abord sans l'IA, même niveau que l'IA pour <b>{same_n}</b>. "
              "Votre impression est aussi notée sur la fiche PDF.</div>")
