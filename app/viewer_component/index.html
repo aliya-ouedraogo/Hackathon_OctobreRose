@@ -92,7 +92,7 @@ html,body{margin:0;font-family:'Inter',system-ui,sans-serif;color:var(--ink);bac
 @keyframes dash{to{stroke-dashoffset:-24}}.att-path{animation:dash 1.6s linear infinite}
 @keyframes breathe{0%,100%{opacity:.5}50%{opacity:1}}.halo{animation:breathe 2.6s ease-in-out infinite}
 @media (prefers-reduced-motion:reduce){.att-path,.halo{animation:none}.view.anim{transition:none}}
-@media (max-width:560px){.b .tx{display:none}.loupe canvas{width:104px;height:104px}.loupe .lt{display:none}.mini{display:none}.stage{height:420px}}
+@media (max-width:560px){.keys{display:none}.b .tx{display:none}.loupe canvas{width:104px;height:104px}.loupe .lt{display:none}.mini{display:none}.stage{height:420px}}
 </style></head><body>
 <div class="wrap" id="wrap">
  <div class="stage" id="stage" aria-label="Échographie : molette ou pincement pour zoomer, glisser pour se déplacer">
@@ -166,13 +166,21 @@ const zoneName=(z,i)=>z.kind==='lesion'?`${LES} ${i+1}`:`Zone d'influence ${i+1}
 const pressed=id=>$(id).getAttribute('aria-pressed')==='true';
 const clone=a=>JSON.parse(JSON.stringify(a));
 function rect(){return stage.getBoundingClientRect();}
+let STAGE_MAX=600, INSET=0;
 function layout(){const th=$('tools').offsetHeight+20; $('mini').style.top=th+'px'; $('lblL').style.top=th+'px'; $('lblR').style.top=th+'px';
-  const r=rect(); fit=Math.min(r.width/W,r.height/H); view.style.width=(W*fit)+'px'; view.style.height=(H*fit)+'px';}
+  // Écran étroit : le cadre prend la hauteur de l'image (plus la barre d'outils), sans bandes noires inutiles,
+  // et l'image commence sous la barre d'outils au lieu d'être cachée par elle.
+  const narrow=stage.clientWidth<640; INSET=narrow?th:0;
+  const hh=narrow?Math.max(260,Math.min(STAGE_MAX,Math.round(stage.clientWidth*H/W)+INSET+44)):STAGE_MAX;
+  if(stage.style.height!==hh+'px'){stage.style.height=hh+'px'; setTimeout(setHeight,0);}
+  const r=rect(); fit=Math.min(r.width/W,(r.height-INSET)/H); view.style.width=(W*fit)+'px'; view.style.height=(H*fit)+'px';}
 function clampPan(){const r=rect(),vw=W*fit*s,vh=H*fit*s;
-  tx=vw<=r.width?(r.width-vw)/2:Math.min(0,Math.max(r.width-vw,tx)); ty=vh<=r.height?(r.height-vh)/2:Math.min(0,Math.max(r.height-vh,ty));}
+  tx=vw<=r.width?(r.width-vw)/2:Math.min(0,Math.max(r.width-vw,tx)); ty=vh<=r.height-INSET?INSET+(r.height-INSET-vh)/2:Math.min(INSET,Math.max(r.height-vh,ty));}
 function bboxOf(pts){let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; pts.forEach(([x,y])=>{x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x);y1=Math.max(y1,y);}); return [x0,y0,x1-x0,y1-y0];}
 function apply(anim){
   clampPan(); view.classList.toggle('anim',!!anim);
+  // Sans zoom ni annotation, un glissement vertical du doigt fait défiler la page (le pincement zoome toujours).
+  stage.style.touchAction=(s>1.01||pressed('tDraw'))?'none':'pan-y';
   view.style.transform=`translate(${tx}px,${ty}px) scale(${s})`;
   $('zv').textContent=Math.round(s*100)+' %';
   const r=rect(),vw=W*fit*s,vh=H*fit*s; $('mini').classList.toggle('on',s>1.05);
@@ -282,7 +290,7 @@ function finishDraw(){
   ANN.push({level:pickLv, points:pts.filter((_,k)=>k%step===0).map(([x,y])=>[Math.round(x*10)/10,Math.round(y*10)/10])});
   drawAnn();
 }
-$('tDraw').onclick=()=>{const on=tog('tDraw'); stage.classList.toggle('draw',on); $('picks').classList.toggle('hidden',!on); note(); setTimeout(layout,0);};
+$('tDraw').onclick=()=>{const on=tog('tDraw'); stage.classList.toggle('draw',on); $('picks').classList.toggle('hidden',!on); note(); setTimeout(()=>{layout(); apply(false);},0);};
 document.querySelectorAll('.pick').forEach(b=>b.onclick=()=>{pickLv=b.dataset.lv; document.querySelectorAll('.pick').forEach(x=>x.setAttribute('aria-pressed',x===b));});
 document.querySelectorAll('.pick').forEach(b=>b.style.setProperty('--c',LV[b.dataset.lv].c));
 $('save').onclick=()=>{SAVED=clone(ANN); send('streamlit:setComponentValue',{value:{img_key:IMGKEY, annotations:SAVED, ts:Date.now()}, dataType:'json'}); renderAnnList();};
@@ -369,7 +377,7 @@ function init(a){
   W=a.w; H=a.h; ZONES=a.zones||[]; LVL=a.color; SHARP=a.sharp; HEAT=a.heat||''; LES=a.lesion; LVK=a.level; IMGKEY=a.img_key;
   SAVED=clone(a.saved||[]); ANN=clone(SAVED); cur=-1; s=1; tx=0; ty=0; hover=null; drawing=null;
   document.documentElement.style.setProperty('--lvl',LVL);
-  if(a.stage_h) stage.style.height=a.stage_h+'px';
+  if(a.stage_h){STAGE_MAX=a.stage_h; stage.style.height=a.stage_h+'px';}
   $('ov').setAttribute('viewBox',`0 0 ${W} ${H}`); $('blur').setAttribute('stdDeviation',(Math.max(W,H)/160).toFixed(1));
   imgBase.src=a.base; $('miniImg').src=a.base; imgSharp.removeAttribute('src'); $('imgHeat').removeAttribute('src');
   ['tAtt','tSharp','tCmp'].forEach(id=>{if(pressed(id)) $(id).click();});
