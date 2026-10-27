@@ -149,7 +149,7 @@ def meta(entry: dict, demo: bool) -> str:
 # --------------------------------------------------------------------------
 # Guide de lecture (fenêtre)
 # --------------------------------------------------------------------------
-@st.dialog("Comment lire un résultat", width="large")
+@st.dialog("Comment lire un résultat", width="medium")
 def reading_guide(settings):
     st.markdown(f"""
 #### 1. La couleur : le niveau d'alerte
@@ -257,21 +257,29 @@ def impression_card(key: str, impressions: dict, revealed: set):
         pick = st.radio("Votre impression", IMPRESSIONS, index=None, key=f"imp_{key}",
                         format_func=lambda k: LEVELS[k]["label"], label_visibility="collapsed")
         if st.button("Afficher l'analyse de l'IA", icon=":material/visibility:", type="primary",
-                     use_container_width=True, disabled=pick is None, key=f"reveal_{key}"):
-            impressions[key] = pick
+                     use_container_width=True, key=f"reveal_{key}"):
+            if pick is None:
+                st.warning("Choisissez d'abord votre impression, ou passez cette étape.", icon=":material/touch_app:")
+            else:
+                impressions[key] = pick
+                revealed.add(key)
+                st.rerun()
+        if st.button("Passer sans noter d'impression", key=f"skip_{key}", type="tertiary", use_container_width=True):
+            impressions.pop(key, None)
             revealed.add(key)
             st.rerun()
-        if st.button("Passer sans noter d'impression", key=f"skip_{key}", type="tertiary"):
-            revealed.add(key)
-            st.rerun()
+
+
+def _blind_changed():
+    # Réactiver « Lire d'abord » cache de nouveau l'analyse, même pour une image déjà dévoilée.
+    if st.session_state.get("blind"):
+        st.session_state.setdefault("revealed", set()).clear()
 
 
 def page_analyse():
     top("Analyser")
-    h, ctl = st.columns([1.25, 1], vertical_alignment="bottom")
-    with h:
-        ui.header("Lecture assistée", "Analyser une échographie",
-                  "L'IA apporte un regard complémentaire et montre les zones à regarder. La décision reste au professionnel.")
+    ui.header("Lecture assistée", "Analyser une échographie",
+              "L'IA apporte un regard complémentaire et montre les zones à regarder. La décision reste au professionnel.")
     if need_models():
         return
     an = get_analyzer()
@@ -279,25 +287,35 @@ def page_analyse():
     labels = [c["file"] for c in cases]
     opened = st.session_state.pop("open_case", None)
     data, name, truth = None, None, None
-    with ctl:
-        src = st.segmented_control("Source", ["Cas de démo", "Importer"], default="Cas de démo" if cases else "Importer",
-                                   key="src", label_visibility="collapsed")
-        if opened:
-            name, data = opened["name"], opened["data"]
-            truth = next((c for c in cases if c["file"] == name), None)
-            st.caption(f"Ouvert depuis la vue d'ensemble : **{name}**")
-        elif src == "Cas de démo" and cases:
-            pick = st.selectbox("Cas de démonstration", labels, key="demo_pick", label_visibility="collapsed",
-                                format_func=lambda f: f"Cas {labels.index(f) + 1:02d} · {f}")
-            truth = cases[labels.index(pick)]
-            data, name = (DEMO_DIR / pick).read_bytes(), pick
-        elif src == "Importer":
-            up = st.file_uploader("Échographie (PNG ou JPG)", type=["png", "jpg", "jpeg"], label_visibility="collapsed")
-            if up:
-                data, name = up.getvalue(), up.name
-        st.toggle("Lire d'abord sans l'IA", key="blind",
-                  help="Vous lisez l'image seule et notez votre impression avant de voir l'analyse de l'IA, "
-                       "pour ne pas être influencé par elle.")
+    with st.container(border=True, key="source_box"):
+        c_pick, c_blind = st.columns([2.2, 1.3], gap="large", vertical_alignment="top")
+        with c_pick:
+            st.markdown("<div class='eb-label'>Image à analyser</div>", unsafe_allow_html=True)
+            src = st.segmented_control("Source", ["Cas de démo", "Importer"],
+                                       default="Cas de démo" if cases else "Importer",
+                                       key="src", label_visibility="collapsed")
+            if opened:
+                name, data = opened["name"], opened["data"]
+                truth = next((c for c in cases if c["file"] == name), None)
+                st.caption(f"Ouvert depuis la vue d'ensemble : **{name}**")
+            elif src == "Cas de démo" and cases:
+                pick = st.selectbox("Cas de démonstration", labels, key="demo_pick", label_visibility="collapsed",
+                                    format_func=lambda f: f"Cas {labels.index(f) + 1:02d} · {f}")
+                truth = cases[labels.index(pick)]
+                data, name = (DEMO_DIR / pick).read_bytes(), pick
+                st.caption("8 échographies du jeu de test, jamais vues par le modèle.")
+            elif src == "Importer":
+                up = st.file_uploader("Échographie (PNG ou JPG)", type=["png", "jpg", "jpeg"],
+                                      label_visibility="collapsed")
+                if up:
+                    data, name = up.getvalue(), up.name
+                st.caption("Gardée le temps de votre visite seulement : actualiser la page l'efface.")
+        with c_blind:
+            with st.container(key="blind_box"):
+                st.markdown(f"<div class='eb-blind-t'>{ui.icon('eye-off', 18, ui.WINE)}<b>Lire d'abord sans l'IA</b></div>"
+                            "<div class='eb-blind-d'>Lisez l'image seule et notez votre impression, "
+                            "puis découvrez l'analyse de l'IA.</div>", unsafe_allow_html=True)
+                st.toggle("Activer", key="blind", on_change=_blind_changed)
 
     if data is None:
         st.markdown(f"<div class='eb-card' style='text-align:center;padding:3rem'>{ui.icon('image-up', 40, ui.WINE, 1.5)}"
@@ -316,12 +334,15 @@ def page_analyse():
     for w in res.warnings:
         st.warning(w, icon=":material/warning:")
 
+    g_txt, g_btn = st.columns([3, 1], vertical_alignment="center")
+    g_txt.markdown("<div class='eb-guide-hint'>Couleurs, pourcentage, tracés : le guide explique comment lire chaque "
+                   "élément du résultat.</div>", unsafe_allow_html=True)
+    with g_btn:
+        if st.button("Guide de lecture", icon=":material/arrow_forward:", icon_position="right", type="primary",
+                     key="guide_btn", use_container_width=True):
+            reading_guide(an.settings)
     with st.container(border=True, key="legend_box"):
-        lh, lb = st.columns([3, 1], vertical_alignment="center")
-        lh.markdown("<div class='eb-label'>Légende</div>", unsafe_allow_html=True)
-        with lb:
-            if st.button("Guide de lecture", icon=":material/menu_book:", type="primary", key="guide_btn"):
-                reading_guide(an.settings)
+        st.markdown("<div class='eb-label'>Légende</div>", unsafe_allow_html=True)
         ui.legend()
 
     revealed: set = st.session_state.setdefault("revealed", set())

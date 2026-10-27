@@ -32,6 +32,9 @@ ICONS = {
     "users": '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
     "ruler": '<path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/><path d="m14.5 12.5 2-2"/><path d="m11.5 9.5 2-2"/><path d="m8.5 6.5 2-2"/><path d="m17.5 15.5 2-2"/>',
     "eye": '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+    "eye-off": '<path d="M10.73 5.08A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a13.2 13.2 0 0 1-1.67 2.68"/>'
+               '<path d="M6.61 6.61A13.5 13.5 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.39-1.61"/>'
+               '<path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="m2 2 20 20"/>',
 }
 
 
@@ -111,9 +114,26 @@ div[data-baseweb="select"]>div, [data-testid="stTextInput"] input{ border-radius
 
 /* Légende et guide */
 .st-key-legend_box{ background:#fff; box-shadow:var(--shadow); margin-bottom:.6rem; }
-.eb-demo{ display:flex; gap:.6rem; align-items:flex-start; background:#FCEFDF; border:1px solid #F3D3AE; color:#5C3A10; border-radius:var(--radius); padding:.65rem .9rem; font-size:.86rem; line-height:1.45; }
+.eb-demo{ margin-bottom:1rem; display:flex; gap:.6rem; align-items:flex-start; background:#FCEFDF; border:1px solid #F3D3AE; color:#5C3A10; border-radius:var(--radius); padding:.65rem .9rem; font-size:.86rem; line-height:1.45; }
 .eb-demo svg{ flex:none; margin-top:.15rem; }
 [class*='st-key-impression_box']{ background:#fff; box-shadow:var(--shadow); }
+/* Page Analyser : barre de choix de l'image */
+.st-key-source_box [data-testid='stSegmentedControl'] button{ white-space:nowrap; }
+.st-key-source_box{ background:#fff; box-shadow:var(--shadow); margin:.4rem 0 .9rem; }
+.st-key-blind_box{ background:var(--lav); border:1px solid var(--lav-2); border-radius:var(--radius); padding:.7rem .9rem .3rem; }
+.eb-blind-t{ display:flex; gap:.45rem; align-items:center; color:var(--wine); font-size:.98rem; }
+.eb-blind-d{ color:var(--muted); font-size:.82rem; line-height:1.4; margin:.2rem 0 .15rem; }
+.st-key-blind_box [data-testid="stCheckbox"] p{ font-weight:600; color:var(--ink); }
+.eb-guide-hint{ color:var(--muted); font-size:.9rem; line-height:1.45; }
+.st-key-guide_btn button{ min-height:46px; }
+/* Bouton désactivé lisible */
+.stButton>button[kind="primary"]:disabled{ background:#EAD7DF; border-color:#EAD7DF; color:#8A6B78; box-shadow:none; }
+.stButton>button[kind="tertiary"]{ border:none; background:transparent; min-height:38px; }
+.stButton>button[kind="tertiary"]:hover{ text-decoration:underline; background:transparent; }
+/* Fenêtre du guide : taille raisonnable, défilement interne, fond flouté (clic à côté pour fermer) */
+[data-testid="stDialog"]{ backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px); background:rgba(42,31,44,.28); }
+[data-testid="stDialog"] [role="dialog"]{ max-height:82vh; overflow-y:auto; border-radius:20px; }
+@media (max-width:640px){ [data-testid="stDialog"] [role="dialog"]{ max-height:88vh; } }
 [class*='st-key-decision_box']{ background:#fff; box-shadow:var(--shadow); margin-top:.8rem; }
 .st-key-guide_btn{ display:flex; justify-content:flex-end; }
 .st-key-guide_btn button{ min-height:38px; padding:.35rem 1rem; }
@@ -285,7 +305,7 @@ def triage_card(res, settings):
         crit.append(f"<div class='eb-crit'>{icon(ic[0], 17, ic[1])}<span>{html.escape(r)}</span></div>")
     st.markdown(f"""<div class='eb-card'>
 <div class='eb-row'><span class='eb-label'>Résultat de l'IA</span>{badge(res.level)}</div>
-<div style='margin-top:.7rem' class='eb-big'>{pct(p, '&thinsp;')}<small>probabilité de malignité estimée sur l'image</small></div>
+<div style='margin-top:.7rem' class='eb-big'>{pct(p, '&thinsp;')}<small>probabilité de malignité</small></div>
 <div style='font-size:.8rem;color:var(--muted);margin-top:.15rem'>Estimée sur l'image seule. Seul un prélèvement confirme ou écarte un cancer.</div>
 <div class='eb-thr' aria-label='Probabilité de malignité {p:.0%}, seuil de relecture {settings.t_orange:.0%}, seuil d alerte forte {settings.t_red:.0%}'>
 <div class='fill' style='width:{p * 100:.1f}%'></div>{mk}</div>
