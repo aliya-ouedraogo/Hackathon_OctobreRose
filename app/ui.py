@@ -67,12 +67,15 @@ h4{ color:var(--ink); }
 [data-testid="stSidebar"] [data-testid="stPageLink"] a[aria-current="page"] p,
 [data-testid="stSidebar"] [data-testid="stPageLink"] a[aria-current="page"] span{ color:var(--wine) !important; font-weight:600; }
 
-/* Boutons */
-.stButton>button, .stDownloadButton>button, [data-testid="stPopover"] button{ border-radius:12px; font-weight:600; min-height:44px;
-  border:1px solid var(--line); background:#fff; transition:background .15s, box-shadow .2s, transform .15s; }
-.stButton>button[kind="primary"], .stDownloadButton>button[kind="primary"]{ background:var(--wine); border-color:var(--wine); color:#fff;
-  box-shadow:0 10px 24px -12px rgba(142,29,74,.8); }
-.stButton>button[kind="primary"]:hover, .stDownloadButton>button[kind="primary"]:hover{ background:var(--wine-2); transform:translateY(-1px); }
+/* Boutons : coins peu arrondis, couleur douce, largeur adaptée au texte */
+.stButton>button, .stDownloadButton>button, [data-testid="stPopover"] button, [data-testid="stLinkButton"] a{ border-radius:8px;
+  font-weight:600; min-height:40px; padding:.45rem 1rem; border:1px solid var(--line); background:#fff;
+  transition:background .15s, border-color .15s; }
+.stButton>button[kind="primary"], .stDownloadButton>button[kind="primary"], [data-testid="stLinkButton"] a[kind="primary"]{
+  background:#F6E7EE; border-color:#E5C6D4; color:var(--wine); box-shadow:none; }
+.stButton>button[kind="primary"] p, .stDownloadButton>button[kind="primary"] p{ color:var(--wine); }
+.stButton>button[kind="primary"]:hover, .stDownloadButton>button[kind="primary"]:hover, [data-testid="stLinkButton"] a[kind="primary"]:hover{
+  background:#EFD7E2; border-color:#D9AFC2; color:var(--wine); }
 .stButton>button[kind="secondary"]:hover{ background:var(--lav); border-color:var(--lav-2); color:var(--wine); }
 .stButton>button[kind="tertiary"]{ color:var(--wine); font-weight:600; }
 [data-testid="stFileUploaderDropzone"]{ border:1px dashed #D9BFD0; background:#fff; border-radius:var(--radius); }
@@ -125,7 +128,8 @@ div[data-baseweb="select"]>div, [data-testid="stTextInput"] input{ border-radius
 .eb-blind-d{ color:var(--muted); font-size:.82rem; line-height:1.4; margin:.2rem 0 .15rem; }
 .st-key-blind_box [data-testid="stCheckbox"] p{ font-weight:600; color:var(--ink); }
 .eb-guide-hint{ color:var(--muted); font-size:.9rem; line-height:1.45; }
-.st-key-guide_btn button{ min-height:46px; }
+.eb-impr-bilan{ margin-top:.6rem; padding-top:.55rem; border-top:1px dashed var(--line); color:var(--muted); font-size:.84rem; line-height:1.45; }
+@media (max-width:640px){ .st-key-source_box [data-testid='stHorizontalBlock']{ gap:.5rem; } }
 /* Bouton désactivé lisible */
 .stButton>button[kind="primary"]:disabled{ background:#EAD7DF; border-color:#EAD7DF; color:#8A6B78; box-shadow:none; }
 .stButton>button[kind="tertiary"]{ border:none; background:transparent; min-height:38px; }
@@ -279,16 +283,20 @@ def legend():
     st.markdown(f"<div class='eb-leg'>{items}</div><div class='eb-leg eb-leg2'>{lines}</div>", unsafe_allow_html=True)
 
 
-def impression_compare(mine: str, ai: str):
-    """Impression du professionnel (lecture sans l'IA) face au niveau de l'IA."""
+def impression_compare(mine: str, ai: str, n: int = 1, same_n: int = 0):
+    """Lecture du professionnel (avant l'IA) face au niveau de l'IA, et bilan de la visite."""
     same = mine == ai
-    note = ("Même niveau que l'IA." if same else
-            "Avis différents : prenez le temps de comparer votre lecture et celle de l'IA.")
+    note = ("Même niveau que l'IA : vos deux lectures se confirment." if same else
+            "Avis différents : c'est le cas où le second regard est le plus utile. Reprenez l'image, "
+            "en regardant la zone entourée et les zones qui ont pesé, avant de décider.")
+    bilan = (f"<div class='eb-impr-bilan'><b>Votre visite :</b> {n} image{'s' if n > 1 else ''} lue{'s' if n > 1 else ''} "
+             f"d'abord sans l'IA, même niveau que l'IA pour <b>{same_n}</b>. "
+             "Votre impression est aussi notée sur la fiche PDF.</div>")
     st.markdown(f"<div class='eb-card' style='margin-bottom:.8rem;border-left:4px solid {'#2F8F62' if same else '#D9822B'}'>"
-                f"<div class='eb-label'>Votre impression avant l'IA</div>"
-                f"<div class='eb-row' style='margin-top:.5rem;flex-wrap:wrap;gap:.5rem'><span>Vous : {badge(mine, 'sm')}</span>"
-                f"<span>IA : {badge(ai, 'sm')}</span></div>"
-                f"<div style='color:var(--muted);font-size:.85rem;margin-top:.45rem'>{note}</div></div>",
+                f"<div class='eb-label'>Votre lecture avant l'IA</div>"
+                f"<div class='eb-row' style='margin-top:.5rem;flex-wrap:wrap;gap:.5rem;justify-content:flex-start'>"
+                f"<span>Vous : {badge(mine, 'sm')}</span><span>IA : {badge(ai, 'sm')}</span></div>"
+                f"<div style='font-size:.88rem;margin-top:.5rem;line-height:1.45'>{note}</div>{bilan}</div>",
                 unsafe_allow_html=True)
 
 

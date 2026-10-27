@@ -5,6 +5,7 @@ Lancer :  streamlit run app/app.py
 from __future__ import annotations
 
 import hashlib
+import importlib
 import html
 import io
 import json
@@ -21,6 +22,9 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(APP_DIR))
 from echobreast.core import APP_NAME, APP_TAGLINE, LEVELS, MODELS_DIR, priority_key  # noqa: E402
 import ui  # noqa: E402
+
+# Streamlit Cloud garde parfois l'ancien ui.py en mémoire après un git push : on recharge toujours le fichier actuel.
+importlib.reload(ui)
 
 DEMO_DIR = APP_DIR / "demo"
 
@@ -257,17 +261,22 @@ def impression_card(key: str, impressions: dict, revealed: set):
         pick = st.radio("Votre impression", IMPRESSIONS, index=None, key=f"imp_{key}",
                         format_func=lambda k: LEVELS[k]["label"], label_visibility="collapsed")
         if st.button("Afficher l'analyse de l'IA", icon=":material/visibility:", type="primary",
-                     use_container_width=True, key=f"reveal_{key}"):
+                     key=f"reveal_{key}"):
             if pick is None:
                 st.warning("Choisissez d'abord votre impression, ou passez cette étape.", icon=":material/touch_app:")
             else:
                 impressions[key] = pick
                 revealed.add(key)
                 st.rerun()
-        if st.button("Passer sans noter d'impression", key=f"skip_{key}", type="tertiary", use_container_width=True):
+        if st.button("Passer sans noter d'impression", key=f"skip_{key}", type="tertiary"):
             impressions.pop(key, None)
             revealed.add(key)
             st.rerun()
+
+
+def _level_of(key: str) -> str | None:
+    entry = _cache_for(key).get(key)
+    return entry["res"].level if entry else None
 
 
 def _blind_changed():
@@ -288,7 +297,7 @@ def page_analyse():
     opened = st.session_state.pop("open_case", None)
     data, name, truth = None, None, None
     with st.container(border=True, key="source_box"):
-        c_pick, c_blind = st.columns([2.2, 1.3], gap="large", vertical_alignment="top")
+        c_pick, c_blind = st.columns([2.2, 1.3], gap="medium", vertical_alignment="top")
         with c_pick:
             st.markdown("<div class='eb-label'>Image à analyser</div>", unsafe_allow_html=True)
             src = st.segmented_control("Source", ["Cas de démo", "Importer"],
@@ -303,7 +312,6 @@ def page_analyse():
                                     format_func=lambda f: f"Cas {labels.index(f) + 1:02d} · {f}")
                 truth = cases[labels.index(pick)]
                 data, name = (DEMO_DIR / pick).read_bytes(), pick
-                st.caption("8 échographies du jeu de test, jamais vues par le modèle.")
             elif src == "Importer":
                 up = st.file_uploader("Échographie (PNG ou JPG)", type=["png", "jpg", "jpeg"],
                                       label_visibility="collapsed")
@@ -339,7 +347,7 @@ def page_analyse():
                    "élément du résultat.</div>", unsafe_allow_html=True)
     with g_btn:
         if st.button("Guide de lecture", icon=":material/arrow_forward:", icon_position="right", type="primary",
-                     key="guide_btn", use_container_width=True):
+                     key="guide_btn"):
             reading_guide(an.settings)
     with st.container(border=True, key="legend_box"):
         st.markdown("<div class='eb-label'>Légende</div>", unsafe_allow_html=True)
@@ -369,7 +377,10 @@ def page_analyse():
             impression_card(key, impressions, revealed)
             return
         if key in impressions:
-            ui.impression_compare(impressions[key], res.level)
+            # Bilan de la visite : sur les images lues d'abord sans l'IA, combien de fois même niveau que l'IA.
+            pairs = [(m, _level_of(k)) for k, m in impressions.items()]
+            pairs = [(m, a) for m, a in pairs if a]
+            ui.impression_compare(impressions[key], res.level, len(pairs), sum(m == a for m, a in pairs))
         ui.triage_card(res, an.settings)
         from echobreast.inference import draw_contour
         from echobreast.report import build_pdf
@@ -390,13 +401,7 @@ def page_analyse():
                                              res, version, decision().get("reference") or name, annotations=anns,
                                              decision=decision(), impression=impressions.get(key)),
                            file_name=f"echobreast_{Path(name).stem}.pdf", mime="application/pdf", type="primary",
-                           icon=":material/download:", use_container_width=True)
-        if truth:
-            with st.popover("Voir la vérité terrain (démo)", icon=":material/fact_check:", use_container_width=True):
-                st.markdown(f"Étiquette du jeu BUSI : **{truth['verite']}**")
-                if truth.get("erreur_du_modele"):
-                    st.markdown("Ce cas est montré **volontairement** : le modèle s'y trompe. "
-                                "C'est pour cela que la décision reste au professionnel.")
+                           icon=":material/download:")
 
 
 # --------------------------------------------------------------------------
