@@ -149,16 +149,27 @@ div[data-baseweb="select"]>div, [data-testid="stTextInput"] input{ border-radius
 .st-key-guide_btn{ display:flex; justify-content:flex-end; }
 .st-key-guide_btn button{ min-height:38px; padding:.35rem 1rem; }
 .eb-legend{ background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:.8rem 1rem; box-shadow:var(--shadow); }
-.eb-leg{ display:flex; flex-wrap:wrap; gap:.5rem 1.4rem; }
+/* Une ligne : 3 niveaux, puis 4 boutons, répartis sur toute la largeur de la carte */
+.st-key-legend_box{ container-type:inline-size; }
+.eb-leg{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.5rem 1rem; }
+.eb-leg.eb-leg-tools{ grid-template-columns:repeat(4,minmax(0,1fr)); }
+.eb-leg-i b{ font-weight:600; }
+.eb-leg-i span:not(.eb-badge):not(.eb-leg-ic):not(.dot), .eb-leg-i > b{ white-space:nowrap; }
+/* Carte moins large : le texte passe sous son badge, toujours sur une seule ligne */
+@container (max-width:1000px){ .eb-leg:not(.eb-leg-tools) .eb-leg-i{ flex-direction:column; align-items:flex-start; gap:.3rem; } }
+/* Carte étroite (téléphone, petite fenêtre) : niveaux l'un sous l'autre, boutons en 2 colonnes */
+@container (max-width:640px){ .eb-leg:not(.eb-leg-tools){ grid-template-columns:1fr; }
+  .eb-leg:not(.eb-leg-tools) .eb-leg-i{ flex-direction:row; align-items:center; gap:.6rem; }
+  .eb-leg.eb-leg-tools{ grid-template-columns:1fr 1fr; }
+  .eb-leg-tools .eb-leg-i{ gap:.45rem; font-size:.82rem; } }
+@container (max-width:345px){ .eb-leg-i span:not(.eb-badge):not(.eb-leg-ic):not(.dot), .eb-leg-i > b{ white-space:normal; } }
 .eb-leg-h{ font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); font-weight:600; margin-bottom:.4rem; }
 .eb-leg-ic{ flex:none; width:28px; height:28px; border-radius:6px; background:#1E1620; color:#fff; display:inline-flex;
   align-items:center; justify-content:center; }
 .eb-leg-ic svg{ width:14px !important; height:14px !important; margin:0 !important; }
-@media (max-width:640px){ .eb-leg{ display:grid; grid-template-columns:1fr; gap:.45rem; }
-  .eb-leg.eb-leg-tools{ grid-template-columns:1fr 1fr; gap:.55rem .7rem; }
-  .eb-leg-d{ display:block; color:var(--muted); font-size:.8rem; } .eb-leg-d .sep{ display:none; } }
+
 .eb-leg2{ margin-top:.6rem; padding-top:.6rem; border-top:1px dashed var(--line); }
-.eb-leg-i{ display:flex; gap:.6rem; align-items:center; font-size:.88rem; color:var(--ink); }
+.eb-leg-i{ display:flex; gap:.55rem; align-items:center; font-size:.86rem; color:var(--ink); min-width:0; }
 .eb-leg-i{ align-items:center; line-height:1.35; } .eb-leg-i .eb-badge{ flex:none; }
 /* Fiche PDF : toute la largeur de la colonne sur ordinateur, largeur du texte sur téléphone */
 @media (max-width:640px){ .st-key-pdf_btn, .st-key-pdf_btn [data-testid="stDownloadButton"], .st-key-pdf_btn button{ width:auto !important; } }
@@ -298,12 +309,9 @@ def legend():
                      ("orange", "signes possibles ou doute"),
                      ("vert", "pas un « normal » garanti")))
     tools = "".join(
-        f"<div class='eb-leg-i'><span class='eb-leg-ic'>{viewer_icon(b)}</span>"
-        f"<span><b>{n}</b><span class='eb-leg-d'><span class='sep'> · </span>{t}</span></span></div>"
-        for b, n, t in (("tContour", "Contour", "zone repérée"),
-                        ("tSharp", "Netteté", "lecture plus facile"),
-                        ("tCmp", "Avant / après", "comparer"),
-                        ("tDraw", "Annoter", "entourer une zone")))
+        f"<div class='eb-leg-i'><span class='eb-leg-ic'>{viewer_icon(b)}</span><b>{n}</b></div>"
+        for b, n in (("tContour", "Contour de l'IA"), ("tSharp", "Netteté"),
+                     ("tCmp", "Avant / après"), ("tDraw", "Annoter soi-même")))
     st.markdown(f"<div class='eb-leg-h'>Niveau d'alerte</div><div class='eb-leg'>{levels}</div>"
                 f"<div class='eb-leg-h' style='margin-top:.7rem'>Boutons de l'image</div><div class='eb-leg eb-leg-tools'>{tools}</div>",
                 unsafe_allow_html=True)
