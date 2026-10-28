@@ -152,7 +152,7 @@ div[data-baseweb="select"]>div, [data-testid="stTextInput"] input{ border-radius
 /* Une ligne : 3 niveaux, puis 4 boutons, répartis sur toute la largeur de la carte */
 .st-key-legend_box{ container-type:inline-size; }
 .eb-leg{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.5rem 1rem; }
-.eb-leg.eb-leg-tools{ grid-template-columns:repeat(4,minmax(0,1fr)); }
+.eb-leg.eb-leg-tools{ grid-template-columns:repeat(4,minmax(0,1fr)); padding-bottom:1.15rem; }
 .eb-leg-i b{ font-weight:600; }
 .eb-leg-i span:not(.eb-badge):not(.eb-leg-ic):not(.dot), .eb-leg-i > b{ white-space:nowrap; }
 /* Carte moins large : le texte passe sous son badge, toujours sur une seule ligne */
