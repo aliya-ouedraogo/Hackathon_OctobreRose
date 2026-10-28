@@ -107,13 +107,13 @@ div[data-baseweb="select"]>div, [data-testid="stTextInput"] input{ border-radius
 .eb-mono{ font-family:var(--mono); }
 .eb-row{ display:flex; justify-content:space-between; align-items:center; gap:.6rem; }
 
-/* Badge de niveau (pastille lumineuse) */
-.eb-badge{ --c:#999; display:inline-flex; align-items:center; gap:.45rem; padding:.28rem .75rem .28rem .6rem; border-radius:999px;
-  font-weight:600; font-size:.88rem; color:var(--c); background:var(--soft); white-space:nowrap;
-  box-shadow:0 0 0 1px color-mix(in srgb,var(--c) 22%,transparent), 0 6px 18px -8px color-mix(in srgb,var(--c) 70%,transparent); }
-.eb-badge .dot{ width:8px; height:8px; border-radius:50%; background:var(--c); }
+/* Badge de niveau : sobre, coins peu arrondis, sans halo */
+.eb-badge{ --c:#999; display:inline-flex; align-items:center; gap:.4rem; padding:.22rem .6rem; border-radius:6px;
+  font-weight:600; font-size:.86rem; color:var(--c); background:var(--soft); white-space:nowrap;
+  border:1px solid color-mix(in srgb,var(--c) 30%,transparent); }
+.eb-badge .dot{ width:7px; height:7px; border-radius:2px; background:var(--c); }
 .eb-badge svg{ margin-left:-.1rem; }
-.eb-badge.sm{ font-size:.8rem; padding:.2rem .6rem .2rem .5rem; }
+.eb-badge.sm{ font-size:.78rem; padding:.14rem .5rem; }
 
 /* Légende et guide */
 .st-key-legend_box{ background:#fff; box-shadow:var(--shadow); margin-bottom:.6rem; }
@@ -149,11 +149,19 @@ div[data-baseweb="select"]>div, [data-testid="stTextInput"] input{ border-radius
 .st-key-guide_btn{ display:flex; justify-content:flex-end; }
 .st-key-guide_btn button{ min-height:38px; padding:.35rem 1rem; }
 .eb-legend{ background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:.8rem 1rem; box-shadow:var(--shadow); }
-.eb-leg{ display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:.5rem 1.2rem; }
+.eb-leg{ display:flex; flex-wrap:wrap; gap:.5rem 1.4rem; }
+.eb-leg-h{ font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); font-weight:600; margin-bottom:.4rem; }
+.eb-leg-ic{ flex:none; width:28px; height:28px; border-radius:6px; background:#1E1620; color:#fff; display:inline-flex;
+  align-items:center; justify-content:center; }
+.eb-leg-ic svg{ width:14px !important; height:14px !important; margin:0 !important; }
+@media (max-width:640px){ .eb-leg{ display:grid; grid-template-columns:1fr; gap:.45rem; }
+  .eb-leg.eb-leg-tools{ grid-template-columns:1fr 1fr; gap:.55rem .7rem; }
+  .eb-leg-d{ display:block; color:var(--muted); font-size:.8rem; } .eb-leg-d .sep{ display:none; } }
 .eb-leg2{ margin-top:.6rem; padding-top:.6rem; border-top:1px dashed var(--line); }
 .eb-leg-i{ display:flex; gap:.6rem; align-items:center; font-size:.88rem; color:var(--ink); }
-.eb-leg-i{ align-items:flex-start; } .eb-leg-i .eb-badge{ flex:none; min-width:7.2rem; } .eb-leg-i svg{ margin-top:5px; }
-.eb-leg-i svg{ flex:none; width:34px; }
+.eb-leg-i{ align-items:center; line-height:1.35; } .eb-leg-i .eb-badge{ flex:none; }
+/* Fiche PDF : toute la largeur de la colonne sur ordinateur, largeur du texte sur téléphone */
+@media (max-width:640px){ .st-key-pdf_btn, .st-key-pdf_btn [data-testid="stDownloadButton"], .st-key-pdf_btn button{ width:auto !important; } }
 .eb-guide{ display:flex; gap:.6rem; align-items:flex-start; background:#FAF5FA; border-radius:12px; padding:.7rem .8rem; margin-top:.8rem;
   font-size:.86rem; color:#4A3F4C; line-height:1.5; }
 .eb-guide svg{ flex:none; margin-top:2px; } .eb-guide b{ display:block; color:var(--ink); margin-bottom:.15rem; }
@@ -272,19 +280,33 @@ def pct(p: float, sep: str = " ") -> str:
     return f"{p * 100:.0f}{sep}%"
 
 
+@lru_cache
+def viewer_icon(button_id: str) -> str:
+    """Icône d'un bouton de la visionneuse, reprise telle quelle de viewer_component/index.html."""
+    import re
+
+    src = (Path(__file__).resolve().parent / "viewer_component" / "index.html").read_text(encoding="utf-8")
+    m = re.search(r'id="%s"[^>]*>(<svg.*?</svg>)' % button_id, src, re.S)
+    return m.group(1) if m else ""
+
+
 def legend():
-    """Légende permanente : signification des couleurs et des contours."""
-    items = "".join(
+    """Légende courte : les trois niveaux d'alerte et les boutons de l'image."""
+    levels = "".join(
         f"<div class='eb-leg-i'>{badge(k, 'sm')}<span>{t}</span></div>"
-        for k, t in (("rouge", "très évocateur d'une lésion maligne : relecture approfondie suggérée"),
-                     ("orange", "incertain ou à surveiller : à examiner de près"),
-                     ("vert", "peu de signes inquiétants, ce n'est pas un « normal » garanti")))
-    lines = ("<div class='eb-leg-i'><svg width='34' height='12'><path d='M2 6h30' stroke='#8E1D4A' stroke-width='3' "
-             "stroke-linecap='round'/></svg><span><b>Trait plein</b> : contour de la lésion repérée</span></div>"
-             "<div class='eb-leg-i'><svg width='34' height='12'><rect width='34' height='12' rx='3' fill='#2A1F2C'/><path d='M4 6h26' stroke='#FFFFFF' stroke-width='6' "
-             "stroke-linecap='round'/><path d='M4 6h26' stroke='#D9822B' stroke-width='2.5' stroke-linecap='round'/></svg>"
-             "<span><b>Bordé de blanc, « Soignant »</b> : zone ajoutée par le professionnel</span></div>")
-    st.markdown(f"<div class='eb-leg'>{items}</div><div class='eb-leg eb-leg2'>{lines}</div>", unsafe_allow_html=True)
+        for k, t in (("rouge", "image très évocatrice"),
+                     ("orange", "signes possibles ou doute"),
+                     ("vert", "pas un « normal » garanti")))
+    tools = "".join(
+        f"<div class='eb-leg-i'><span class='eb-leg-ic'>{viewer_icon(b)}</span>"
+        f"<span><b>{n}</b><span class='eb-leg-d'><span class='sep'> · </span>{t}</span></span></div>"
+        for b, n, t in (("tContour", "Contour", "zone repérée"),
+                        ("tSharp", "Netteté", "lecture plus facile"),
+                        ("tCmp", "Avant / après", "comparer"),
+                        ("tDraw", "Annoter", "entourer une zone")))
+    st.markdown(f"<div class='eb-leg-h'>Niveau d'alerte</div><div class='eb-leg'>{levels}</div>"
+                f"<div class='eb-leg-h' style='margin-top:.7rem'>Boutons de l'image</div><div class='eb-leg eb-leg-tools'>{tools}</div>",
+                unsafe_allow_html=True)
 
 
 def impression_compare(mine: str, ai: str, n: int = 1, same_n: int = 0):

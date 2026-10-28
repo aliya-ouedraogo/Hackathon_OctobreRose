@@ -351,7 +351,6 @@ def page_analyse():
                      key="guide_btn"):
             reading_guide(an.settings)
     with st.container(border=True, key="legend_box"):
-        st.markdown("<div class='eb-label'>Légende</div>", unsafe_allow_html=True)
         ui.legend()
 
     revealed: set = st.session_state.setdefault("revealed", set())
@@ -402,7 +401,7 @@ def page_analyse():
                                              res, version, decision().get("reference") or name, annotations=anns,
                                              decision=decision(), impression=impressions.get(key)),
                            file_name=f"echobreast_{Path(name).stem}.pdf", mime="application/pdf", type="primary",
-                           icon=":material/download:")
+                           icon=":material/download:", key="pdf_btn", use_container_width=True)
 
 
 # --------------------------------------------------------------------------
