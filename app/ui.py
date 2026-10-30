@@ -334,6 +334,18 @@ def impression_compare(mine: str, ai: str, n: int = 1, same_n: int = 0):
                 unsafe_allow_html=True)
 
 
+def lecture_pct(p: float) -> str:
+    """Le pourcentage dit en mots : ce qu'il signifiait lors des tests du modèle."""
+    n = round(p * 100)
+    if n < 1:
+        part = "moins d'une était maligne"
+    elif n >= 99:
+        part = "presque toutes étaient malignes"
+    else:
+        part = f"environ {n} étai{'en' if n > 1 else ''}t malignes" if n > 1 else "environ 1 était maligne"
+    return f"Lors des tests, sur 100 images auxquelles l'IA a donné ce score, {part}."
+
+
 def triage_card(res, settings):
     lv = LEVELS[res.level]
     p = res.p_malignant
@@ -348,7 +360,7 @@ def triage_card(res, settings):
     st.markdown(f"""<div class='eb-card'>
 <div class='eb-row'><span class='eb-label'>Résultat de l'IA</span>{badge(res.level)}</div>
 <div style='margin-top:.7rem' class='eb-big'>{pct(p, '&thinsp;')}<small>probabilité de malignité</small></div>
-<div style='font-size:.8rem;color:var(--muted);margin-top:.15rem'>Estimée sur l'image seule. Seul un prélèvement confirme ou écarte un cancer.</div>
+<div style='font-size:.84rem;color:var(--muted);margin-top:.2rem;line-height:1.45'>{lecture_pct(p)} Seul un prélèvement confirme ou écarte un cancer.</div>
 <div class='eb-thr' aria-label='Probabilité de malignité {p:.0%}, seuil de relecture {settings.t_orange:.0%}, seuil d alerte forte {settings.t_red:.0%}'>
 <div class='fill' style='width:{p * 100:.1f}%'></div>{mk}</div>
 <div class='eb-scale'><span>0 %</span><span>100 %</span></div>

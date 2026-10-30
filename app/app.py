@@ -124,15 +124,6 @@ def top(page: str):
     an = get_analyzer()
     version = an.settings.model_version if an else "absent"
     ui.topbar(page, version, "SYNTH" in version.upper())
-    if ONLINE:
-        b, f = st.columns([4, 1], vertical_alignment="center")
-        b.markdown(f"<div class='eb-demo'>{ui.icon('triangle-alert', 16, '#9A5410')}<span><b>Version de démonstration en ligne.</b> "
-                   "Utilisez les cas de démonstration ou des images anonymisées : n'importez aucune image permettant "
-                   "d'identifier une patiente. Les images sont analysées sans être enregistrées.</span></div>",
-                   unsafe_allow_html=True)
-        if FEEDBACK_URL:
-            f.link_button("Donner mon avis", FEEDBACK_URL, icon=":material/rate_review:", type="primary",
-                          use_container_width=True)
 
 
 def need_models() -> bool:
@@ -318,7 +309,7 @@ def page_analyse():
                                       label_visibility="collapsed")
                 if up:
                     data, name = up.getvalue(), up.name
-                st.caption("Gardée le temps de votre visite seulement : actualiser la page l'efface.")
+                st.caption("Images anonymisées uniquement. Gardée le temps de votre visite : actualiser la page l'efface.")
         with c_blind:
             with st.container(key="blind_box"):
                 st.markdown(f"<div class='eb-blind-t'>{ui.icon('eye-off', 18, ui.WINE)}<b>Lire d'abord sans l'IA</b></div>"
@@ -824,4 +815,8 @@ with st.sidebar:
                 unsafe_allow_html=True)
     st.page_link(PAGES["rose"], label="Informations santé", icon=":material/volunteer_activism:",
                  use_container_width=True)
+    if FEEDBACK_URL:
+        st.write("")
+        st.link_button("Donner mon avis", FEEDBACK_URL, icon=":material/rate_review:", type="primary",
+                       use_container_width=True)
 nav.run()
