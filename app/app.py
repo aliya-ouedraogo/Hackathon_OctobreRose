@@ -358,7 +358,8 @@ def page_analyse():
         vkey = f"{key}-seule" if hidden else key
         val = render_viewer(assets["base"], assets["sharp"], None if hidden else assets["heat"],
                             [] if hidden else assets["zones"], raw.size, res.level, img_key=vkey,
-                            saved=store.get(key, []), stage_height=600)
+                            saved=store.get(key, []), stage_height=600,
+                            session_id=st.session_state.setdefault("sid", os.urandom(8).hex()))
         if val and val.get("img_key") == vkey:
             store[key] = val.get("annotations", [])
         if not hidden:

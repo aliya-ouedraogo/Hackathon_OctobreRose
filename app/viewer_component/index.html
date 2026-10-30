@@ -46,6 +46,16 @@ html,body{margin:0;font-family:'Inter',system-ui,sans-serif;color:var(--ink);bac
 .tag.hum{background:#fff;color:var(--c);border:2px solid var(--c);box-shadow:0 4px 14px rgba(0,0,0,.35)}
 .tag.hum .n{background:var(--c);color:#fff}
 .tag.hum .src{background:var(--c);color:#fff}
+/* Étiquettes du soignant sous le tracé (celles de l'IA au-dessus) : jamais l'une sur l'autre. */
+.tag.hum{transform:translate(-50%,0);margin-top:12px}.tag.hum::after{top:auto;bottom:100%}
+.tag.hum.up{transform:translate(-50%,-100%);margin-top:-12px}.tag.hum.up::after{top:100%;bottom:auto}
+.unsaved{position:absolute;right:12px;bottom:12px;z-index:6;display:flex;align-items:center;gap:8px;background:#FFF4E5;color:#7A3E08;
+  border:1px solid #F0B35B;border-radius:999px;padding:4px 4px 4px 12px;font:600 12.5px 'Inter';box-shadow:0 6px 18px rgba(0,0,0,.35)}
+.unsaved .dot{width:8px;height:8px;border-radius:50%;background:#D9822B}
+.unsaved button{border:0;border-radius:999px;background:var(--wine);color:#fff;font:600 12.5px 'Inter';padding:6px 12px;cursor:pointer;min-height:30px}
+.stage.has-unsaved .loupe{bottom:58px}
+.btn.primary.attn{animation:attn 1.8s ease-in-out infinite}
+@keyframes attn{0%,100%{box-shadow:0 0 0 0 rgba(142,29,74,.45)}50%{box-shadow:0 0 0 6px rgba(142,29,74,0)}}
 .tag.cut{opacity:0;pointer-events:none}
 .loupe{position:absolute;right:12px;bottom:44px;display:flex;gap:10px;align-items:flex-end;z-index:4;pointer-events:none;opacity:0;transition:opacity .25s}
 .loupe.on{opacity:1}
@@ -91,7 +101,7 @@ html,body{margin:0;font-family:'Inter',system-ui,sans-serif;color:var(--ink);bac
 .status{font-size:12.5px;color:var(--muted)}.status.dirty{color:#9A5410;font-weight:600}.status.ok{color:#25704D;font-weight:600}
 @keyframes dash{to{stroke-dashoffset:-24}}.att-path{animation:dash 1.6s linear infinite}
 @keyframes breathe{0%,100%{opacity:.5}50%{opacity:1}}.halo{animation:breathe 2.6s ease-in-out infinite}
-@media (prefers-reduced-motion:reduce){.att-path,.halo{animation:none}.view.anim{transition:none}}
+@media (prefers-reduced-motion:reduce){.att-path,.halo,.btn.primary.attn{animation:none}.view.anim{transition:none}}
 @media (max-width:560px){.keys{display:none}.b .tx{display:none}.loupe canvas{width:104px;height:104px}.loupe .lt{display:none}.mini{display:none}.stage{height:420px}}
 </style></head><body>
 <div class="wrap" id="wrap">
@@ -131,6 +141,7 @@ html,body{margin:0;font-family:'Inter',system-ui,sans-serif;color:var(--ink);bac
       </span>
     </div>
   </div>
+  <div class="unsaved hidden" id="unsaved" role="status"><span class="dot"></span><span id="unsavedT">Tracés non enregistrés</span><button id="save2">Enregistrer</button></div>
   <div class="mini" id="mini"><div class="t">VUE GLOBALE <i></i></div><div class="box"><img id="miniImg" alt=""><div class="r" id="miniR"></div></div></div>
   <div class="loupe" id="loupe"><div class="lt" id="lt"></div><canvas id="lc" width="300" height="300"></canvas></div>
   <span class="note" id="note"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span id="noteT">Vue originale</span></span>
@@ -157,7 +168,14 @@ function setHeight(){ send('streamlit:setFrameHeight', {height: document.getElem
 
 const LV={rouge:{c:'#C8264E',l:'Alerte forte'}, orange:{c:'#D9822B',l:'À examiner de près'}, vert:{c:'#2F8F62',l:'Peu de signes'}};
 let W=1, H=1, ZONES=[], LVL='#8E1D4A', SHARP='', HEAT='', LES='Zone suspecte', LVK='orange', IMGKEY=null;
-let ANN=[], SAVED=[], pickLv='orange', drawing=null;
+let ANN=[], SAVED=[], pickLv='orange', drawing=null, AIOFF=false, SID='', BASE='';
+/* Brouillon des tracés, partagé entre la lecture sans l'IA et l'affichage de l'analyse (clé d'image sans « -seule »).
+   Lié à la session Streamlit : actualiser la page démarre une nouvelle session et efface tout. */
+const draftKey=()=>'ebdraft:'+SID+':'+BASE;
+function readDraft(){try{const v=sessionStorage.getItem(draftKey()); return v?JSON.parse(v):null;}catch(e){return null;}}
+function writeDraft(){try{if(dirty()) sessionStorage.setItem(draftKey(),JSON.stringify(ANN)); else sessionStorage.removeItem(draftKey());}catch(e){}}
+function purgeDrafts(){try{for(let i=sessionStorage.length-1;i>=0;i--){const k=sessionStorage.key(i);
+  if(k&&k.startsWith('ebdraft:')&&!k.startsWith('ebdraft:'+SID+':')) sessionStorage.removeItem(k);}}catch(e){}}
 const $=id=>document.getElementById(id), stage=$('stage'), view=$('view'), NS='http://www.w3.org/2000/svg';
 let fit=1, s=1, tx=0, ty=0, cur=-1, split=.5, loupeOn=true, hover=null;
 const imgBase=$('imgBase'), imgSharp=$('imgSharp');
@@ -187,8 +205,10 @@ function apply(anim){
   const x0=Math.max(0,-tx/vw),y0=Math.max(0,-ty/vh),x1=Math.min(1,(r.width-tx)/vw),y1=Math.min(1,(r.height-ty)/vh);
   Object.assign($('miniR').style,{left:x0*100+'%',top:y0*100+'%',width:(x1-x0)*100+'%',height:(y1-y0)*100+'%'});
   const place=()=>{document.querySelectorAll('.tag').forEach(t=>{
-      const b=t.dataset.ann!==undefined?bboxOf(ANN[+t.dataset.ann].points):ZONES[+t.dataset.i].bbox, [x,y,w]=b;
-      t.style.left=(tx+(x+w/2)*fit*s)+'px'; t.style.top=(ty+y*fit*s)+'px';});
+      const hum=t.dataset.ann!==undefined, b=hum?bboxOf(ANN[+t.dataset.ann].points):ZONES[+t.dataset.i].bbox, [x,y,w,h]=b;
+      t.style.left=(tx+(x+w/2)*fit*s)+'px';
+      if(hum){const below=ty+(y+h)*fit*s, up=below+44>r.height; t.classList.toggle('up',up); t.style.top=(up?ty+y*fit*s:below)+'px';}
+      else t.style.top=(ty+y*fit*s)+'px';});
     const sx=tx+split*W*fit*s; $('split').style.left=(sx-1)+'px'; cmpClip(sx); drawLoupe();};
   if(anim){setTimeout(place,560);} place();
 }
@@ -203,9 +223,12 @@ function focusZone(i){
   focusBox(ZONES[i].bbox); caption();
 }
 function caption(){
-  const c=$('cap'); $('zc').textContent=ZONES.length?(cur<0?`Vue d'ensemble · ${ZONES.length} zone(s) de l'IA`:`Zone ${cur+1} sur ${ZONES.length}`):'Aucune zone signalée par l’IA';
-  if(!ZONES.length){c.innerHTML='Le modèle ne signale aucune zone particulière sur cette image.';return;}
-  if(cur<0){c.innerHTML='Cliquez une zone, une étiquette sur l’image (ou utilisez ‹ ›) pour zoomer dessus.';return;}
+  const c=$('cap');
+  if(AIOFF){$('zc').textContent='Analyse de l’IA masquée'; c.innerHTML='Lecture sans l’IA : entourez ce qui vous semble suspect. Vos tracés resteront sur l’image quand l’analyse de l’IA s’affichera, pour comparer.'; return;}
+  const who=ANN.length?' <br>Sur l’image, l’étiquette <b>IA</b> marque le tracé de l’IA, l’étiquette <b>Soignant</b> vos propres tracés.':'';
+  $('zc').textContent=ZONES.length?(cur<0?`Vue d'ensemble · ${ZONES.length} zone(s) de l'IA`:`Zone ${cur+1} sur ${ZONES.length}`):'Aucune zone signalée par l’IA';
+  if(!ZONES.length){c.innerHTML='Le modèle ne signale aucune zone particulière sur cette image.'+who;return;}
+  if(cur<0){c.innerHTML='Cliquez une zone, une étiquette sur l’image (ou utilisez ‹ ›) pour zoomer dessus.'+who;return;}
   const z=ZONES[cur];
   c.innerHTML=z.kind==='lesion'
    ?`<b>Zone ${cur+1} : ${LVK==='vert'?'lésion repérée, d\'aspect plutôt bénin pour l\'IA':LVK==='rouge'?'lésion repérée, jugée suspecte par l\'IA':'lésion repérée, à vérifier'}.</b> Elle occupe ${z.area_pct.toFixed(1).replace('.',',')} % de l'image. Sa taille réelle en mm ne peut pas être mesurée.`
@@ -270,10 +293,12 @@ function renderAnnList(){
     row.querySelector('.del').onclick=()=>{ANN.splice(i,1); drawAnn();};
     box.appendChild(row);
   });
-  const d=dirty(); $('save').disabled=!d; $('discard').disabled=!d;
+  const d=dirty(); $('save').disabled=!d; $('discard').disabled=!d; $('save').classList.toggle('attn',d);
+  $('unsaved').classList.toggle('hidden',!d); stage.classList.toggle('has-unsaved',d); writeDraft();
+  if(cur<0) caption();
   const st=$('status');
   st.className='status'+(d?' dirty':(SAVED.length?' ok':''));
-  st.textContent=d?'Modifications non enregistrées':(SAVED.length?`Enregistré · ${SAVED.length} zone(s) incluse(s) dans la fiche PDF`:'Aucune annotation');
+  st.textContent=d?'Modifications non enregistrées : cliquez sur « Enregistrer » pour les garder et les mettre dans la fiche PDF':(SAVED.length?`Enregistré · ${SAVED.length} zone(s) incluse(s) dans la fiche PDF`:'Aucune annotation');
   setTimeout(setHeight,0);
 }
 function toNat(e){const r=rect(); return [((e.clientX-r.left)-tx)/(fit*s), ((e.clientY-r.top)-ty)/(fit*s)];}
@@ -294,6 +319,7 @@ $('tDraw').onclick=()=>{const on=tog('tDraw'); stage.classList.toggle('draw',on)
 document.querySelectorAll('.pick').forEach(b=>b.onclick=()=>{pickLv=b.dataset.lv; document.querySelectorAll('.pick').forEach(x=>x.setAttribute('aria-pressed',x===b));});
 document.querySelectorAll('.pick').forEach(b=>b.style.setProperty('--c',LV[b.dataset.lv].c));
 $('save').onclick=()=>{SAVED=clone(ANN); send('streamlit:setComponentValue',{value:{img_key:IMGKEY, annotations:SAVED, ts:Date.now()}, dataType:'json'}); renderAnnList();};
+$('save2').onclick=()=>$('save').click();
 $('discard').onclick=()=>{ANN=clone(SAVED); drawAnn();};
 
 /* ---------- loupe ---------- */
@@ -375,7 +401,8 @@ imgBase.onload=()=>{layout(); apply(false); setHeight();};
 /* ---------- initialisation à chaque nouvelle image ---------- */
 function init(a){
   W=a.w; H=a.h; ZONES=a.zones||[]; LVL=a.color; SHARP=a.sharp; HEAT=a.heat||''; LES=a.lesion; LVK=a.level; IMGKEY=a.img_key;
-  SAVED=clone(a.saved||[]); ANN=clone(SAVED); cur=-1; s=1; tx=0; ty=0; hover=null; drawing=null;
+  SID=a.sid||''; BASE=String(a.img_key||'').replace(/-seule$/,''); purgeDrafts();
+  SAVED=clone(a.saved||[]); ANN=clone(readDraft()||SAVED); cur=-1; s=1; tx=0; ty=0; hover=null; drawing=null;
   document.documentElement.style.setProperty('--lvl',LVL);
   if(a.stage_h){STAGE_MAX=a.stage_h; stage.style.height=a.stage_h+'px';}
   $('ov').setAttribute('viewBox',`0 0 ${W} ${H}`); $('blur').setAttribute('stdDeviation',(Math.max(W,H)/160).toFixed(1));
@@ -383,9 +410,12 @@ function init(a){
   ['tAtt','tSharp','tCmp'].forEach(id=>{if(pressed(id)) $(id).click();});
   if(!pressed('tContour')) $('tContour').click();
   // Lecture sans l'IA (ni zone ni carte) : on masque les outils qui n'auraient rien à montrer.
-  const aiOff=!ZONES.length&&!HEAT;
+  const aiOff=AIOFF=!ZONES.length&&!HEAT;
   ['tContour','tAtt','tCmp'].forEach(id=>{$(id).style.display=aiOff?'none':'';});
   $('tAtt').style.display=HEAT?'':'none';
+  $('annHint').innerHTML=aiOff
+    ?'Cliquez sur <b>Annoter</b>, choisissez une couleur, puis entourez ce qui vous semble suspect. Pensez à <b>enregistrer</b> : vos tracés resteront ensuite sur l’image, à côté de ceux de l’IA, chacun avec son étiquette.'
+    :'Une zone vous semble suspecte et l’IA ne l’a pas entourée ? Cliquez sur <b>Annoter</b>, choisissez une couleur, puis entourez la zone sur l’image. Vos tracés portent l’étiquette « Soignant » pour ne jamais être confondus avec ceux de l’IA.';
   drawZones(); setVisible('attention',false); layout(); apply(false); renderChips(); caption(); note(); drawAnn(); setHeight();
 }
 window.addEventListener('message',ev=>{
